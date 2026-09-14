@@ -1,0 +1,38 @@
+.sandtable-auth-form .auth-container {
+  width: 100%;
+}
+
+.sandtable-auth-form .auth-button {
+  min-height: 46px;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.sandtable-auth-form .auth-input {
+  min-height: 46px;
+  font-size: 0.875rem;
+  box-shadow: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.sandtable-auth-form .auth-input:focus {
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.12);
+}
+
+.sandtable-auth-form .auth-label {
+  margin-bottom: 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.sandtable-auth-form .auth-message {
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.sandtable-auth-form a {
+  font-size: 0.75rem;
+}

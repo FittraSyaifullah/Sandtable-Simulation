@@ -9,6 +9,7 @@ import { ConversationPanel, ConversationProposal } from "@/components/Conversati
 import { ResultsSheet } from "@/components/ResultsSheet";
 import { CalibrationCase, MethodDialog } from "@/components/MethodDialog";
 import { HistoricalRun, SavedStudy, StudyLibrary } from "@/components/StudyLibrary";
+import { UserMenu } from "@/components/UserMenu";
 import { WorldCanvas } from "@/components/WorldCanvas";
 import { supabase } from "@/integrations/supabase/client";
 import { defaultScenario, fallbackNations, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
@@ -141,6 +142,7 @@ export default function Index() {
       <div className="mx-1 h-7 w-px bg-white/10"/><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-stone-300">{config.name}</p><p className="truncate text-[10px] text-stone-600">{config.regionLabel}</p></div>
       <div className="hidden items-center gap-1 md:flex"><NavButton icon={FlaskConical} label="Conversation" onClick={()=>setSetupOpen(true)}/><NavButton icon={Archive} label="Studies" onClick={loadLibrary}/><NavButton icon={BookOpen} label="Method" onClick={()=>setMethodOpen(true)}/></div>
       <div className="hidden rounded-xl border border-emerald-500/20 bg-emerald-500/[.06] px-3 py-2 text-[10px] text-emerald-300 lg:block"><span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"/>Model ready · v0.3</div>
+      <UserMenu />
       <Button onClick={()=>setSetupOpen(value=>!value)} size="icon" variant="ghost" className="h-11 w-11 shrink-0 rounded-xl text-stone-400 md:hidden" aria-label={setupOpen?"Show globe":"Show conversation"}>{setupOpen?<Globe2 className="h-5 w-5"/>:<MessageCircle className="h-5 w-5"/>}</Button>
       <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-11 w-11 shrink-0 rounded-xl text-stone-400 md:hidden" aria-label="Open navigation menu"><Menu className="h-5 w-5"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-[#0c0c0c] p-2 text-stone-200"><DropdownMenuItem onSelect={()=>setSetupOpen(true)} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><MessageCircle className="mr-3 h-4 w-4 text-yellow-300"/>Conversation</DropdownMenuItem><DropdownMenuItem onSelect={loadLibrary} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><Archive className="mr-3 h-4 w-4 text-yellow-300"/>Saved studies</DropdownMenuItem><DropdownMenuItem onSelect={()=>setMethodOpen(true)} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><BookOpen className="mr-3 h-4 w-4 text-yellow-300"/>Method & evidence</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
     </header>
