@@ -2,6 +2,12 @@
 
 A governed, map-first laboratory for exploring aggregate future-conflict scenarios.
 
+## Product flow
+
+The authenticated experience is deliberately limited to three steps: describe one hypothetical scenario, choose two country chips, and start. Sandtable then opens a full-screen globe with automatic playback, pause, timeline scrubbing, and speed controls. Low zoom shows national domain groups; closer zoom reveals synthetic division groups, battalion groups, fleet groups, fighter squadrons, and support commands with fictional identifiers.
+
+Formation labels and positions are illustrative outputs derived from aggregate asset pools. They never claim to represent a real named unit, real deployment, or operational route.
+
 ## National AI agents
 
 Each strategic interval follows an authenticated observe → decide → validate → adjudicate → freeze loop. The two bounded national agents receive separate aggregate observation packets and are invoked independently, so neither can see its opponent's current decision. Their structured stance and priority decisions are committed together in one immutable `agent_turns` record before the deterministic engine produces the next frame. That resulting frame is hashed and frozen one-to-one in `agent_turn_outcomes` before another turn can begin. Session configuration, observations, decisions, adjudications, model/fallback mode, hashes, and timestamps remain auditable through owner-only records.
@@ -16,9 +22,9 @@ The authenticated `asset-research` Edge Function accepts supplied approved-sourc
 
 ## Mapbox
 
-The workspace uses Mapbox GL as its primary interactive map and retains a local globe if Mapbox cannot initialize. Each simulation automatically replays its weekly frames; aggregate formation layers transition between frame positions while the route and objective state update on the globe.
+Mapbox GL renders the primary interactive globe. Strategic domain groups split into synthetic formation-level markers as users zoom closer. Weekly frames animate the aggregate movement corridors and objective state; a local strategic globe remains available if Mapbox cannot initialize.
 
-Set `VITE_MAPBOX_ACCESS_TOKEN` to a public Mapbox token (`pk.*`) in the deployment environment. For Vercel, add it to the Sandtable project's Production and Preview environments, then redeploy. Restrict the token to the approved production and preview domains in Mapbox.
+Set `VITE_MAPBOX_ACCESS_TOKEN` to a public Mapbox token (`pk.*`) in the deployment environment. For Vercel, add it to the Sandtable project's Production and Preview environments, then redeploy. Restrict the token to approved production and preview domains in Mapbox.
 
 ## Production
 

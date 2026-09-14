@@ -1,199 +1,122 @@
-import { useEffect, useMemo, useState } from "react";
-import { Archive, BookOpen, ChevronDown, ChevronRight, Globe2, MessageCircle, Save, ShieldCheck, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Globe2, Radio, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AgentSetupPanel } from "@/components/AgentSetupPanel";
-import { ResultsSheet } from "@/components/ResultsSheet";
-import { CalibrationCase, MethodDialog } from "@/components/MethodDialog";
-import { HistoricalRun, SavedStudy, StudyLibrary } from "@/components/StudyLibrary";
+import { FormationSelection, MapboxStatus, MapboxWorld } from "@/components/MapboxWorld";
+import { ScenarioLauncher } from "@/components/ScenarioLauncher";
+import { SimulationHUD } from "@/components/SimulationHUD";
 import { UserMenu } from "@/components/UserMenu";
-import { WorldCanvas } from "@/components/WorldCanvas";
 import { supabase } from "@/integrations/supabase/client";
 import { buildTurnObservations } from "@/lib/agents";
 import { AgentTurn, AssetPool, DATASET_VERSION, defaultScenario, fallbackNations, MODEL_VERSION, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
 import { runSimulation } from "@/lib/simulation";
 
-export default function Index() {
-  const navigate = useNavigate();
-  const [nations, setNations] = useState<Nation[]>(fallbackNations);
-  const [assetPools, setAssetPools] = useState<AssetPool[]>([]);
-  const [config, setConfig] = useState<ScenarioConfig>(defaultScenario);
-  const [result, setResult] = useState<SimulationResult>();
-  const [week, setWeek] = useState(0);
-  const [setupOpen, setSetupOpen] = useState(true);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [methodOpen, setMethodOpen] = useState(false);
-  const [introOpen, setIntroOpen] = useState(() => sessionStorage.getItem("sandtable-intro") !== "dismissed");
-  const [comparison, setComparison] = useState<{ label: string; result: SimulationResult }>();
-  const [running, setRunning] = useState(false);
-  const [agentProgress, setAgentProgress] = useState({ current: 0, total: 0 });
-  const [replaying, setReplaying] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<SavedStudy[]>([]);
-  const [calibrationCases, setCalibrationCases] = useState<CalibrationCase[]>([]);
-  const [scenarioId, setScenarioId] = useState<string>();
-  const activeFrame = result?.frames[Math.min(week, result.frames.length - 1)];
-  const activeDataset = useMemo(() => result?.assetDatasetVersion ? `${nations[0]?.dataset_version ?? "local fallback"} · ${result.assetDatasetVersion}` : nations[0]?.dataset_version ?? "local fallback", [nations, result]);
+const RUN_DURATION=12;
 
-  useEffect(() => {
-    supabase.from("nations").select("*").order("name").then(({ data, error }) => {
-      if (data?.length) setNations(data as Nation[]);
-      if (error) toast.info("Using governed local reference data", { description: "The Supabase reference query was unavailable." });
-    });
-    supabase.from("asset_pools").select("*").eq("review_status", "approved").then(({ data }) => {
-      if (data?.length) setAssetPools(data as AssetPool[]);
-    });
-    supabase.from("calibration_cases").select("*").eq("lifecycle_status","active").then(({ data }) => setCalibrationCases((data ?? []) as CalibrationCase[]));
-  }, []);
+function scenarioName(prompt:string){const words=prompt.trim().replace(/[^a-zA-Z0-9\s-]/g,"").split(/\s+/).slice(0,7).join(" ");return words||"Untitled simulation";}
+function seedFor(prompt:string,codes:string[]){let hash=2166136261;for(const character of `${prompt}:${codes.join(":")}`){hash^=character.charCodeAt(0);hash=Math.imul(hash,16777619);}return `ST-${(hash>>>0).toString(16).toUpperCase().padStart(8,"0")}`;}
+function terrainFor(prompt:string):ScenarioConfig["terrain"]{if(/sea|ocean|maritime|island|shipping|strait/i.test(prompt))return"maritime";if(/mountain|urban|city|forest|restricted/i.test(prompt))return"restricted";return"mixed";}
 
-  useEffect(() => {
-    if (!replaying || !result) return;
-    if (week >= result.frames.length - 1) {
-      setReplaying(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setWeek(current => Math.min(current + 1, result.frames.length - 1)), 620);
-    return () => window.clearTimeout(timer);
-  }, [replaying, result, week]);
+export default function Index(){
+  const [nations,setNations]=useState<Nation[]>(fallbackNations);
+  const [assetPools,setAssetPools]=useState<AssetPool[]>([]);
+  const [prompt,setPrompt]=useState("");
+  const [selectedCodes,setSelectedCodes]=useState<string[]>([]);
+  const [config,setConfig]=useState<ScenarioConfig>(defaultScenario);
+  const [result,setResult]=useState<SimulationResult>();
+  const [week,setWeek]=useState(0);
+  const [playing,setPlaying]=useState(false);
+  const [speed,setSpeed]=useState(1);
+  const [launcherOpen,setLauncherOpen]=useState(true);
+  const [running,setRunning]=useState(false);
+  const [progress,setProgress]=useState({current:0,total:RUN_DURATION});
+  const [mapStatus,setMapStatus]=useState<MapboxStatus>("loading");
+  const [selectedFormation,setSelectedFormation]=useState<FormationSelection>();
 
-  const run = async () => {
-    setReplaying(false);
-    setRunning(true);
-    setAgentProgress({ current: 0, total: config.duration });
-    const nationA = nations.find(nation => nation.code === config.sideA.nationCode);
-    const nationB = nations.find(nation => nation.code === config.sideB.nationCode);
-    if (!nationA || !nationB) { setRunning(false); toast.error("Choose two national profiles"); return; }
-    const profile = (nation:Nation) => ({ code:nation.code, name:nation.name, budget:nation.budget_usd_bn, gdp:nation.gdp_usd_bn, population:nation.population_m, personnel:nation.personnel_k, readiness:nation.readiness_index, datasetVersion:nation.dataset_version, asOfDate:nation.as_of_date });
-    try {
-      const poolResponse = await supabase.from("asset_pools").select("*").eq("review_status", "approved").in("nation_code", [nationA.code, nationB.code]);
-      const runPools = poolResponse.data?.length ? poolResponse.data as AssetPool[] : assetPools;
-      if (poolResponse.data?.length) setAssetPools(current => [...current.filter(pool => pool.nation_code !== nationA.code && pool.nation_code !== nationB.code), ...(poolResponse.data as AssetPool[])]);
-      if (poolResponse.error) toast.warning("Asset pool query unavailable", { description: "The run will use deterministic four-domain pools derived from governed national indicators." });
+  useEffect(()=>{
+    supabase.from("nations").select("*").order("name").then(({data})=>{if(data?.length)setNations(data as Nation[]);});
+    supabase.from("asset_pools").select("*").eq("review_status","approved").then(({data})=>{if(data?.length)setAssetPools(data as AssetPool[]);});
+  },[]);
 
-      const sessionKey = crypto.randomUUID();
-      let sessionId: string | undefined;
-      let turns: AgentTurn[] = [];
-      let adjudicated = runSimulation(config, nations, turns, runPools);
-      const scenario = { name:config.name, seed:config.seed, modelVersion:MODEL_VERSION, datasetVersion:DATASET_VERSION, assetDatasetVersion:adjudicated.assetDatasetVersion ?? "asset-pools-unavailable", configuration:config };
+  useEffect(()=>{
+    if(!playing||!result)return;
+    if(week>=result.frames.length-1){setPlaying(false);return;}
+    const timer=window.setTimeout(()=>setWeek(current=>Math.min(current+1,result.frames.length-1)),Math.max(180,850/speed));
+    return()=>window.clearTimeout(timer);
+  },[playing,result,speed,week]);
 
-      for (let turnWeek = 1; turnWeek <= config.duration; turnWeek += 1) {
-        setAgentProgress({ current: turnWeek, total: config.duration });
-        const previousTurn = turns.at(-1);
-        const { observationA, observationB } = buildTurnObservations(adjudicated, turnWeek, config.uncertainty, previousTurn);
-        const { data, error } = await supabase.functions.invoke("conflict-agents", { body:{ sessionKey, sessionId, week:turnWeek, duration:config.duration, objective:config.objective, scenario, sideA:{ profile:profile(nationA), observation:observationA }, sideB:{ profile:profile(nationB), observation:observationB } } });
-        if (error || data?.error || !data?.turn?.id || !data?.sessionId) throw new Error(data?.error ?? error?.message ?? `Adaptive turn ${turnWeek} could not be committed.`);
-        sessionId = data.sessionId as string;
-        const committedTurn = data.turn as AgentTurn;
-        const candidateTurns = [...turns, committedTurn];
-        adjudicated = runSimulation(config, nations, candidateTurns, runPools);
-        const resultingFrame = adjudicated.frames[turnWeek];
-        const freeze = await supabase.functions.invoke("agent-turn-freeze", { body:{ sessionId, turnId:committedTurn.id, resultingFrame } });
-        if (freeze.error || freeze.data?.error || !freeze.data?.outcome) throw new Error(freeze.data?.error ?? freeze.error?.message ?? `Adaptive turn ${turnWeek} could not be frozen.`);
-        turns = [...turns, { ...committedTurn, resultingFrame, outcomeHash:freeze.data.outcome.frameHash, frozenAt:freeze.data.outcome.frozenAt }];
+  const toggleNation=(code:string)=>setSelectedCodes(current=>current.includes(code)?current.filter(item=>item!==code):current.length<2?[...current,code]:[current[1],code]);
+
+  const start=async()=>{
+    const nationA=nations.find(nation=>nation.code===selectedCodes[0]);
+    const nationB=nations.find(nation=>nation.code===selectedCodes[1]);
+    if(!nationA||!nationB||prompt.trim().length<24){toast.error("Describe a scenario and choose two countries");return;}
+    const nextConfig:ScenarioConfig={
+      ...defaultScenario,
+      name:scenarioName(prompt),
+      regionLabel:"Synthetic global theatre",
+      objective:prompt.trim(),
+      terrain:terrainFor(prompt),
+      duration:RUN_DURATION,
+      uncertainty:45,
+      seed:seedFor(prompt,selectedCodes),
+      sideA:{...defaultScenario.sideA,nationCode:nationA.code,posture:"balanced"},
+      sideB:{...defaultScenario.sideB,nationCode:nationB.code,posture:"balanced"},
+    };
+    setConfig(nextConfig);setRunning(true);setProgress({current:0,total:RUN_DURATION});setPlaying(false);setSelectedFormation(undefined);
+    const profile=(nation:Nation)=>({code:nation.code,name:nation.name,budget:nation.budget_usd_bn,gdp:nation.gdp_usd_bn,population:nation.population_m,personnel:nation.personnel_k,readiness:nation.readiness_index,datasetVersion:nation.dataset_version,asOfDate:nation.as_of_date});
+    try{
+      const poolResponse=await supabase.from("asset_pools").select("*").eq("review_status","approved").in("nation_code",[nationA.code,nationB.code]);
+      const runPools=poolResponse.data?.length?poolResponse.data as AssetPool[]:assetPools;
+      if(poolResponse.data?.length)setAssetPools(current=>[...current.filter(pool=>pool.nation_code!==nationA.code&&pool.nation_code!==nationB.code),...(poolResponse.data as AssetPool[])]);
+      if(poolResponse.error)toast.warning("Using governed fallback pools",{description:"The approved asset query was unavailable."});
+
+      const sessionKey=crypto.randomUUID();
+      let sessionId:string|undefined;
+      let turns:AgentTurn[]=[];
+      let adjudicated=runSimulation(nextConfig,nations,turns,runPools);
+      const scenario={name:nextConfig.name,seed:nextConfig.seed,modelVersion:MODEL_VERSION,datasetVersion:DATASET_VERSION,assetDatasetVersion:adjudicated.assetDatasetVersion??"asset-pools-unavailable",configuration:nextConfig};
+
+      for(let turnWeek=1;turnWeek<=RUN_DURATION;turnWeek+=1){
+        setProgress({current:turnWeek,total:RUN_DURATION});
+        const observations=buildTurnObservations(adjudicated,turnWeek,nextConfig.uncertainty,turns.at(-1));
+        const decision=await supabase.functions.invoke("conflict-agents",{body:{sessionKey,sessionId,week:turnWeek,duration:RUN_DURATION,objective:nextConfig.objective,scenario,sideA:{profile:profile(nationA),observation:observations.observationA},sideB:{profile:profile(nationB),observation:observations.observationB}}});
+        if(decision.error||decision.data?.error||!decision.data?.turn?.id||!decision.data?.sessionId)throw new Error(decision.data?.error??decision.error?.message??`Turn ${turnWeek} could not be committed.`);
+        sessionId=decision.data.sessionId as string;
+        const committed=decision.data.turn as AgentTurn;
+        adjudicated=runSimulation(nextConfig,nations,[...turns,committed],runPools);
+        const resultingFrame=adjudicated.frames[turnWeek];
+        const freeze=await supabase.functions.invoke("agent-turn-freeze",{body:{sessionId,turnId:committed.id,resultingFrame}});
+        if(freeze.error||freeze.data?.error||!freeze.data?.outcome)throw new Error(freeze.data?.error??freeze.error?.message??`Turn ${turnWeek} could not be frozen.`);
+        turns=[...turns,{...committed,resultingFrame,outcomeHash:freeze.data.outcome.frameHash,frozenAt:freeze.data.outcome.frozenAt}];
       }
 
-      const completed = runSimulation(config, nations, turns, runPools);
-      const next = { ...completed, agentSessionId: sessionId };
-      setResult(next); setComparison(undefined); setWeek(0); setReplaying(true); setSetupOpen(false); setScenarioId(undefined);
-      toast.success("Adaptive simulation committed", { description:`${config.duration} independent turns were observed, decided, adjudicated, and frozen.` });
-    } catch (error) {
-      toast.error("Adaptive simulation stopped", { description:error instanceof Error?error.message:"The national agents could not complete the run." });
-    } finally {
-      setRunning(false);
-      setAgentProgress({ current: 0, total: 0 });
-    }
+      const completed=runSimulation(nextConfig,nations,turns,runPools);
+      setResult({...completed,agentSessionId:sessionId});setWeek(0);setLauncherOpen(false);setPlaying(true);
+      toast.success("Simulation ready",{description:"Press pause or scrub the timeline at any time."});
+    }catch(error){toast.error("Simulation stopped",{description:error instanceof Error?error.message:"The adaptive agents could not finish."});}
+    finally{setRunning(false);setProgress({current:0,total:RUN_DURATION});}
   };
 
-  const runSensitivity = (kind: "tempo" | "supply" | "uncertainty") => {
-    const labels = { tempo: "Lower tempo", supply: "Supply stress", uncertainty: "Higher uncertainty" };
-    const adjusted: ScenarioConfig = kind === "tempo"
-      ? { ...config, tempo: "measured", seed: `${config.seed}-TEMPO` }
-      : kind === "supply"
-        ? { ...config, seed: `${config.seed}-SUPPLY`, sideA: { ...config.sideA, supply: Math.max(20, config.sideA.supply - 20) }, sideB: { ...config.sideB, supply: Math.max(20, config.sideB.supply - 20) } }
-        : { ...config, uncertainty: Math.min(90, config.uncertainty + 20), seed: `${config.seed}-UNCERTAINTY` };
-    setComparison({ label: labels[kind], result: runSimulation(adjusted, nations, result?.agentTurns ?? [], assetPools) });
-  };
+  const newScenario=()=>{setPlaying(false);setWeek(0);setResult(undefined);setPrompt("");setSelectedCodes([]);setLauncherOpen(true);setSelectedFormation(undefined);};
+  const nationA=nations.find(nation=>nation.code===config.sideA.nationCode);
+  const nationB=nations.find(nation=>nation.code===config.sideB.nationCode);
+  const frame=result?.frames[Math.min(week,result.frames.length-1)];
 
-  const saveStudy = async () => {
-    if (!result) return;
-    setSaving(true);
-    try {
-      let row: SavedStudy;
-      if (scenarioId) {
-        const { data, error } = await supabase.from("scenarios").update({ name: config.name, region_label: config.regionLabel, configuration: config, latest_result: result, status: "completed", updated_at: new Date().toISOString() }).eq("id", scenarioId).select().single();
-        if (error) throw error; row = data as SavedStudy;
-      } else {
-        const { data, error } = await supabase.from("scenarios").insert({ workspace_id: "shared-demo", name: config.name, region_label: config.regionLabel, configuration: config, latest_result: result, status: "completed" }).select().single();
-        if (error) throw error; row = data as SavedStudy; setScenarioId(row.id);
-      }
-      const { data: existing } = await supabase.from("simulation_runs").select("id").eq("run_key", result.runKey).maybeSingle();
-      if (!existing) {
-        const { error } = await supabase.from("simulation_runs").insert({ scenario_id: row.id, run_key: result.runKey, seed: result.seed, model_version: result.modelVersion, dataset_version: result.datasetVersion, configuration: config, result, event_log: result.events });
-        if (error) throw error;
-      }
-      toast.success("Study saved", { description: "Configuration and immutable run record preserved." });
-      return row;
-    } catch (error) {
-      toast.error("Study could not be saved", { description: error instanceof Error ? error.message : "Database unavailable." });
-    } finally { setSaving(false); }
-  };
+  return <main className="relative h-[100dvh] overflow-hidden bg-[#07111f] text-stone-100">
+    <MapboxWorld sideA={nationA} sideB={nationB} config={config} frame={frame} capabilities={result?.domainCapabilities} onSelect={setSelectedFormation} onStatusChange={setMapStatus}/>
+    <div className="pointer-events-none absolute inset-0 atlas-grid opacity-15"/>
 
-  const share = async () => {
-    const row = scenarioId ? (await supabase.from("scenarios").select("*").eq("id", scenarioId).single()).data as SavedStudy : await saveStudy();
-    if (row?.share_token) navigate(`/share/${row.share_token}`);
-  };
-
-  const loadLibrary = async () => {
-    const { data, error } = await supabase.from("scenarios").select("id,name,region_label,configuration,latest_result,share_token,updated_at,simulation_runs(*)").eq("workspace_id", "shared-demo").order("updated_at", { ascending: false });
-    if (error) toast.error("Saved studies are unavailable");
-    else setSaved((data ?? []).map(item => ({ ...item, simulation_runs: [...(item.simulation_runs ?? [])].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) })) as SavedStudy[]);
-    setLibraryOpen(true);
-  };
-
-  const openSaved = (item: SavedStudy) => {
-    setReplaying(false); setConfig(item.configuration); setResult(item.latest_result ?? undefined); setComparison(undefined); setWeek(item.latest_result?.frames.length ? item.latest_result.frames.length - 1 : 0); setScenarioId(item.id); setLibraryOpen(false); setSetupOpen(true);
-  };
-
-  const openHistoricalRun = (study: SavedStudy, run: HistoricalRun) => {
-    setReplaying(false); setConfig(run.configuration); setResult(run.result); setComparison(undefined); setWeek(run.result.frames.length - 1); setScenarioId(study.id); setLibraryOpen(false); setSetupOpen(true);
-    toast.info("Historical run reopened", { description: "The immutable configuration and result are now active." });
-  };
-
-  const compareHistoricalRun = (run: HistoricalRun) => {
-    setComparison({ label: `Historical baseline · ${new Date(run.created_at).toLocaleDateString()}`, result: run.result });
-    setLibraryOpen(false);
-    toast.success("Historical baseline attached", { description: "Open Sensitivity to inspect the comparison." });
-  };
-
-  const removeSaved = async (item: SavedStudy) => {
-    const { error } = await supabase.from("scenarios").delete().eq("id", item.id);
-    if (error) toast.error("Study could not be deleted"); else { setSaved(current => current.filter(row => row.id !== item.id)); toast.success("Study deleted"); }
-  };
-
-  return <main className="relative h-[100dvh] min-h-0 overflow-hidden bg-[#050505] text-stone-100">
-    <WorldCanvas config={config} nations={nations} frame={activeFrame} events={result?.events} week={week} panelOpen={setupOpen}/>
-    <header className="absolute inset-x-0 top-0 z-50 flex h-[76px] items-center gap-2 border-b border-white/8 bg-[#050505]/88 px-3 backdrop-blur-xl sm:gap-3 md:px-5">
-      <button onClick={() => setSetupOpen(true)} className="flex shrink-0 items-center gap-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400"><span className="grid h-10 w-10 place-items-center rounded-2xl border border-yellow-400/30 bg-yellow-400/10"><Globe2 className="h-5 w-5 text-yellow-300"/></span><span className="hidden text-left sm:block"><span className="block text-[15px] font-semibold tracking-tight">Sandtable</span><span className="block text-[8px] uppercase tracking-[.2em] text-stone-600">Scenario laboratory</span></span></button>
-      <div className="mx-1 hidden h-7 w-px bg-white/10 sm:block"/><div className="hidden min-w-0 flex-1 sm:block"><p className="truncate text-xs font-medium text-stone-300">{config.name}</p><p className="mt-0.5 truncate text-[9px] uppercase tracking-[.12em] text-stone-600">{config.regionLabel} · {result?"Run complete":"Draft"}</p></div>
-      <div className="flex-1 sm:hidden"/>
-      <div className="hidden rounded-full border border-emerald-500/20 bg-emerald-500/[.06] px-3 py-1.5 text-[9px] text-emerald-300 xl:block"><span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"/>Model ready · v0.3</div>
-      <Button onClick={()=>setSetupOpen(value=>!value)} size="icon" variant="ghost" className="h-11 w-11 shrink-0 rounded-xl text-stone-400 hover:bg-white/[.06] hover:text-stone-100" aria-label={setupOpen?"Show map":"Configure scenario"}>{setupOpen?<Globe2 className="h-5 w-5"/>:<MessageCircle className="h-5 w-5"/>}</Button>
-      <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-11 shrink-0 rounded-xl border border-white/8 bg-white/[.025] px-3 text-stone-400 hover:bg-white/[.06] hover:text-stone-100" aria-label="Open workspace resources"><BookOpen className="h-4 w-4"/><span className="ml-2 hidden text-xs md:inline">Resources</span><ChevronDown className="ml-2 hidden h-3.5 w-3.5 text-stone-600 md:inline"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#0c0c0c] p-2 text-stone-200"><DropdownMenuItem onSelect={loadLibrary} className="h-12 rounded-xl text-xs focus:bg-white/8 focus:text-white"><Archive className="mr-3 h-4 w-4 text-yellow-300"/><span><span className="block">Saved studies</span><span className="mt-0.5 block text-[9px] text-stone-600">Open runs and comparisons</span></span></DropdownMenuItem><DropdownMenuItem onSelect={()=>setMethodOpen(true)} className="h-12 rounded-xl text-xs focus:bg-white/8 focus:text-white"><BookOpen className="mr-3 h-4 w-4 text-yellow-300"/><span><span className="block">Method & evidence</span><span className="mt-0.5 block text-[9px] text-stone-600">Inspect model provenance</span></span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-      <UserMenu />
+    <header className="absolute inset-x-0 top-0 z-50 flex h-16 items-center gap-3 border-b border-white/8 bg-[#07111f]/88 px-3 backdrop-blur-xl sm:px-5">
+      <button onClick={result?newScenario:()=>setLauncherOpen(true)} className="flex items-center gap-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-300"><span className="grid h-10 w-10 place-items-center rounded-2xl border border-yellow-300/25 bg-yellow-300/10"><Globe2 className="h-5 w-5 text-yellow-300"/></span><span className="hidden text-left sm:block"><span className="block text-sm font-semibold tracking-tight">Sandtable</span><span className="block text-[8px] uppercase tracking-[.2em] text-slate-600">AI conflict simulation</span></span></button>
+      {result&&<div className="min-w-0 flex-1 border-l border-white/8 pl-3"><p className="truncate text-xs font-medium text-slate-200">{config.name}</p><p className="mt-0.5 truncate text-[9px] uppercase tracking-[.14em] text-slate-600">{nationA?.name} · {nationB?.name}</p></div>}
+      {!result&&<div className="flex-1"/>}
+      <div className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 text-[9px] sm:flex ${mapStatus==="ready"?"border-cyan-300/20 bg-cyan-300/[.06] text-cyan-200":"border-yellow-300/20 bg-yellow-300/[.06] text-yellow-200"}`}><Radio className="h-3 w-3"/>{mapStatus==="ready"?"MAPBOX ONLINE":"LOCAL MAP"}</div>
+      {result&&<Button onClick={newScenario} variant="ghost" className="h-10 rounded-xl px-3 text-xs text-slate-400 hover:bg-white/5 hover:text-white"><RotateCcw className="h-4 w-4 sm:mr-2"/><span className="hidden sm:inline">New scenario</span></Button>}
+      <UserMenu/>
     </header>
 
-    {!result && !setupOpen && <div className="absolute bottom-5 left-1/2 z-20 w-[calc(100%-2rem)] max-w-xs -translate-x-1/2 md:hidden"><Button onClick={()=>setSetupOpen(true)} className="stable-action h-12 w-full rounded-2xl bg-yellow-400 px-5 text-[#181500] hover:bg-yellow-300"><MessageCircle className="mr-2 h-4 w-4"/>Open conversation</Button></div>}
-    <AgentSetupPanel visible={setupOpen} config={config} setConfig={setConfig} nations={nations} running={running} progress={agentProgress} onRun={run} onClose={()=>setSetupOpen(false)}/>
-    {result && <ResultsSheet result={result} config={config} week={week} setWeek={setWeek} onSave={saveStudy} onShare={share} onSensitivity={runSensitivity} comparison={comparison} saving={saving}/>}
-
-    <Dialog open={introOpen} onOpenChange={setIntroOpen}><DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-xl overflow-y-auto rounded-[24px] sm:rounded-[28px] border-white/10 bg-[#0c0c0c] p-0 text-stone-100"><div className="relative h-48 overflow-hidden border-b border-white/8 bg-[#070707]"><div className="atlas-grid absolute inset-0 opacity-50"/><div className="absolute left-1/2 top-1/2 grid h-28 w-28 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-yellow-400/30 bg-yellow-400/[.06]"><Globe2 className="h-10 w-10 text-yellow-300"/></div><div className="absolute bottom-4 left-5 rounded-full border border-white/10 bg-[#0b0b0b] px-3 py-1 text-[9px] uppercase tracking-[.18em] text-stone-400">Inputs → seeded frames → ranges</div></div><div className="p-6"><DialogHeader><DialogTitle className="text-2xl tracking-tight">Explore assumptions, not predictions.</DialogTitle><DialogDescription className="mt-2 leading-relaxed text-stone-400">Sandtable is an educational laboratory for inspecting how aggregate capabilities, terrain, tempo, supply, and uncertainty interact in a simplified deterministic model.</DialogDescription></DialogHeader><div className="mt-5 grid gap-2 sm:grid-cols-3">{[[ShieldCheck,"Non-operational"],[Save,"Reproducible"],[Sparkles,"Reviewable AI"]].map(([Icon,label])=><div key={label as string} className="rounded-2xl border border-white/8 bg-white/[.025] p-3"><Icon className="h-4 w-4 text-yellow-300"/><p className="mt-2 text-xs text-stone-300">{label as string}</p></div>)}</div><Button onClick={()=>{sessionStorage.setItem("sandtable-intro","dismissed");setIntroOpen(false)}} className="mt-5 h-11 w-full rounded-2xl bg-yellow-400 text-[#181500] hover:bg-yellow-300">Enter the laboratory<ChevronRight className="ml-2 h-4 w-4"/></Button></div></DialogContent></Dialog>
-
-
-    <StudyLibrary open={libraryOpen} onOpenChange={setLibraryOpen} studies={saved} hasActiveResult={!!result} onOpenStudy={openSaved} onOpenRun={openHistoricalRun} onCompareRun={compareHistoricalRun} onDelete={removeSaved}/>
-
-    <MethodDialog open={methodOpen} onOpenChange={setMethodOpen} activeDataset={activeDataset} calibrationCases={calibrationCases}/>
+    <ScenarioLauncher visible={launcherOpen} prompt={prompt} onPromptChange={setPrompt} nations={nations} selectedCodes={selectedCodes} onToggleNation={toggleNation} onStart={start} running={running} progress={progress}/>
+    {result&&<SimulationHUD result={result} config={config} nationA={nationA} nationB={nationB} week={week} playing={playing} speed={speed} selected={selectedFormation} onWeekChange={value=>{setPlaying(false);setWeek(value);}} onTogglePlay={()=>setPlaying(value=>!value)} onSpeedChange={setSpeed} onCloseSelection={()=>setSelectedFormation(undefined)} onNewScenario={newScenario}/>} 
   </main>;
 }

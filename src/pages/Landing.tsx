@@ -36,23 +36,23 @@ const demoSteps = [
   {
     label: "Describe",
     icon: MessageSquareText,
-    eyebrow: "Conversation-first setup",
-    title: "Turn a question into reviewable assumptions.",
-    body: "Describe a hypothetical scenario in plain language. Sandtable structures terrain, tempo, duration, and aggregate formations without hiding the inputs.",
+    eyebrow: "One prompt, two countries",
+    title: "Set the scenario in seconds.",
+    body: "Describe one hypothetical conflict, choose two country chips, and start. There are no advanced configuration panels to manage.",
   },
   {
-    label: "Run",
+    label: "Simulate",
     icon: Play,
-    eyebrow: "Deterministic simulation",
-    title: "Run the same model and get the same result.",
-    body: "Every study preserves its seed, model version, dataset version, and event log so results can be reproduced and challenged.",
+    eyebrow: "Adaptive AI turns",
+    title: "Watch both sides react each week.",
+    body: "Independent bounded agents observe the previous aggregate frame while a deterministic engine preserves every resulting movement.",
   },
   {
-    label: "Inspect",
+    label: "Watch",
     icon: ScanSearch,
-    eyebrow: "Transparent outputs",
-    title: "See what changed—and why.",
-    body: "Replay frames, compare sensitivity ranges, inspect assumptions, and share a read-only report instead of relying on a single opaque score.",
+    eyebrow: "Interactive globe timeline",
+    title: "Play, pause, and scrub the conflict.",
+    body: "Zoom from national command groups into synthetic divisions, fleet groups, and squadrons moving across a Mapbox globe.",
   },
 ];
 
@@ -111,15 +111,15 @@ export default function Landing() {
         <div className="absolute left-1/2 top-24 -z-10 h-80 w-80 -translate-x-1/2 rounded-full bg-yellow-400/[.045] blur-3xl lg:left-[72%] lg:top-36" />
         <div className="mx-auto grid min-h-[calc(100dvh-4rem)] max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 md:py-20 lg:grid-cols-[.92fr_1.08fr] lg:gap-16 lg:px-8">
           <div className="landing-rise max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-400/20 bg-yellow-400/[.06] px-3 py-1.5 text-[10px] uppercase tracking-[.16em] text-yellow-200"><Sparkles className="h-3 w-3" />Transparent scenario exploration</div>
-            <h1 className="mt-6 text-[clamp(2.8rem,8vw,5.8rem)] font-semibold leading-[.91] tracking-[-.055em]">Explore the forces<br />behind the <span className="text-yellow-300">outcome.</span></h1>
-            <p className="mt-7 max-w-xl text-base leading-relaxed text-stone-400 sm:text-lg">Sandtable is a governed laboratory for asking hypothetical questions, testing aggregate assumptions, and understanding how simplified scenarios evolve.</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-400/20 bg-yellow-400/[.06] px-3 py-1.5 text-[10px] uppercase tracking-[.16em] text-yellow-200"><Sparkles className="h-3 w-3" />AI-powered strategic replay</div>
+            <h1 className="mt-6 text-[clamp(2.8rem,8vw,5.8rem)] font-semibold leading-[.91] tracking-[-.055em]">Describe it.<br />Then <span className="text-yellow-300">watch it unfold.</span></h1>
+            <p className="mt-7 max-w-xl text-base leading-relaxed text-stone-400 sm:text-lg">Choose two countries, describe a hypothetical conflict, and watch bounded AI agents move synthetic formations across an interactive globe.</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="stable-action h-13 rounded-2xl bg-yellow-400 px-6 text-sm font-semibold text-[#181500] hover:bg-yellow-300"><Link to="/login">Open Sandtable<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
               <Button asChild size="lg" variant="outline" className="stable-action h-13 rounded-2xl border-white/12 bg-white/[.025] px-6 text-sm text-stone-200 hover:bg-white/[.06] hover:text-white"><a href="#product"><Play className="mr-2 h-4 w-4 text-yellow-300" />See how it works</a></Button>
             </div>
             <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-[11px] text-stone-500">
-              {["Review before running", "Repeatable results", "Read-only sharing"].map(item => <span key={item} className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-yellow-300" />{item}</span>)}
+              {["One prompt", "Pause and scrub", "Reproducible turns"].map(item => <span key={item} className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-yellow-300" />{item}</span>)}
             </div>
           </div>
 
