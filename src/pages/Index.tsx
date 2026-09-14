@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Archive, BookOpen, ChevronRight, FlaskConical, Globe2, Menu, Play, Save, ShieldCheck, Sparkles } from "lucide-react";
+import { Archive, BookOpen, ChevronRight, FlaskConical, Globe2, Menu, MessageCircle, Save, ShieldCheck, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ScenarioPanel } from "@/components/ScenarioPanel";
+import { ConversationPanel, ConversationProposal } from "@/components/ConversationPanel";
 import { ResultsSheet } from "@/components/ResultsSheet";
 import { CalibrationCase, MethodDialog } from "@/components/MethodDialog";
 import { HistoricalRun, SavedStudy, StudyLibrary } from "@/components/StudyLibrary";
@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { defaultScenario, fallbackNations, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
 import { runSimulation } from "@/lib/simulation";
 
-type Proposal = { title: string; summary: string; objective: string; terrain: ScenarioConfig["terrain"]; tempo: ScenarioConfig["tempo"]; duration: number; uncertainty: number; formations?: { sideA: ScenarioConfig["sideA"]["formations"]; sideB: ScenarioConfig["sideB"]["formations"] }; assumptions: string[]; alternatives: string[]; safetyNotice: string };
+type Proposal = ConversationProposal;
 
 export default function Index() {
   const navigate = useNavigate();
@@ -49,7 +49,7 @@ export default function Index() {
     setRunning(true);
     window.setTimeout(() => {
       const next = runSimulation(config, nations);
-      setResult(next); setComparison(undefined); setWeek(config.duration); setRunning(false); setSetupOpen(false); setScenarioId(undefined);
+      setResult(next); setComparison(undefined); setWeek(config.duration); setRunning(false); setSetupOpen(true); setScenarioId(undefined);
       toast.success("Simulation resolved", { description: "Canonical replay and 240-sample range are ready." });
     }, 420);
   };
@@ -101,11 +101,11 @@ export default function Index() {
   };
 
   const openSaved = (item: SavedStudy) => {
-    setConfig(item.configuration); setResult(item.latest_result ?? undefined); setComparison(undefined); setWeek(item.latest_result?.frames.length ? item.latest_result.frames.length - 1 : 0); setScenarioId(item.id); setLibraryOpen(false); setSetupOpen(!item.latest_result);
+    setConfig(item.configuration); setResult(item.latest_result ?? undefined); setComparison(undefined); setWeek(item.latest_result?.frames.length ? item.latest_result.frames.length - 1 : 0); setScenarioId(item.id); setLibraryOpen(false); setSetupOpen(true);
   };
 
   const openHistoricalRun = (study: SavedStudy, run: HistoricalRun) => {
-    setConfig(run.configuration); setResult(run.result); setComparison(undefined); setWeek(run.result.frames.length - 1); setScenarioId(study.id); setLibraryOpen(false); setSetupOpen(false);
+    setConfig(run.configuration); setResult(run.result); setComparison(undefined); setWeek(run.result.frames.length - 1); setScenarioId(study.id); setLibraryOpen(false); setSetupOpen(true);
     toast.info("Historical run reopened", { description: "The immutable configuration and result are now active." });
   };
 
@@ -139,18 +139,18 @@ export default function Index() {
     <header className="absolute inset-x-0 top-0 z-30 flex h-[72px] items-center gap-3 border-b border-white/8 bg-[#050505]/72 px-3 backdrop-blur-xl md:px-5">
       <button onClick={() => setSetupOpen(true)} className="flex items-center gap-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400"><span className="grid h-10 w-10 place-items-center rounded-2xl border border-yellow-400/30 bg-yellow-400/10"><Globe2 className="h-5 w-5 text-yellow-300"/></span><span className="text-left"><span className="block text-[15px] font-semibold tracking-tight">Sandtable</span><span className="hidden text-[9px] uppercase tracking-[.2em] text-stone-500 sm:block">Scenario laboratory</span></span></button>
       <div className="mx-1 h-7 w-px bg-white/10"/><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-stone-300">{config.name}</p><p className="truncate text-[10px] text-stone-600">{config.regionLabel}</p></div>
-      <div className="hidden items-center gap-1 md:flex"><NavButton icon={FlaskConical} label="Scenario" onClick={()=>setSetupOpen(true)}/><NavButton icon={Archive} label="Studies" onClick={loadLibrary}/><NavButton icon={BookOpen} label="Method" onClick={()=>setMethodOpen(true)}/></div>
+      <div className="hidden items-center gap-1 md:flex"><NavButton icon={FlaskConical} label="Conversation" onClick={()=>setSetupOpen(true)}/><NavButton icon={Archive} label="Studies" onClick={loadLibrary}/><NavButton icon={BookOpen} label="Method" onClick={()=>setMethodOpen(true)}/></div>
       <div className="hidden rounded-xl border border-emerald-500/20 bg-emerald-500/[.06] px-3 py-2 text-[10px] text-emerald-300 lg:block"><span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"/>Model ready · v0.3</div>
-      <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-11 w-11 shrink-0 rounded-xl text-stone-400 md:hidden" aria-label="Open navigation menu"><Menu className="h-5 w-5"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-[#0c0c0c] p-2 text-stone-200"><DropdownMenuItem onSelect={()=>setSetupOpen(true)} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><FlaskConical className="mr-3 h-4 w-4 text-yellow-300"/>Scenario setup</DropdownMenuItem><DropdownMenuItem onSelect={loadLibrary} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><Archive className="mr-3 h-4 w-4 text-yellow-300"/>Saved studies</DropdownMenuItem><DropdownMenuItem onSelect={()=>setMethodOpen(true)} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><BookOpen className="mr-3 h-4 w-4 text-yellow-300"/>Method & evidence</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+      <Button onClick={()=>setSetupOpen(value=>!value)} size="icon" variant="ghost" className="h-11 w-11 shrink-0 rounded-xl text-stone-400 md:hidden" aria-label={setupOpen?"Show globe":"Show conversation"}>{setupOpen?<Globe2 className="h-5 w-5"/>:<MessageCircle className="h-5 w-5"/>}</Button>
+      <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-11 w-11 shrink-0 rounded-xl text-stone-400 md:hidden" aria-label="Open navigation menu"><Menu className="h-5 w-5"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-[#0c0c0c] p-2 text-stone-200"><DropdownMenuItem onSelect={()=>setSetupOpen(true)} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><MessageCircle className="mr-3 h-4 w-4 text-yellow-300"/>Conversation</DropdownMenuItem><DropdownMenuItem onSelect={loadLibrary} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><Archive className="mr-3 h-4 w-4 text-yellow-300"/>Saved studies</DropdownMenuItem><DropdownMenuItem onSelect={()=>setMethodOpen(true)} className="h-11 rounded-xl text-xs focus:bg-white/8 focus:text-white"><BookOpen className="mr-3 h-4 w-4 text-yellow-300"/>Method & evidence</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
     </header>
 
-    {!result && !setupOpen && <div className="absolute bottom-5 left-1/2 z-20 w-[calc(100%-2rem)] max-w-xs -translate-x-1/2 sm:bottom-8 sm:w-auto"><Button onClick={()=>setSetupOpen(true)} className="h-12 w-full rounded-2xl bg-yellow-400 px-5 text-[#181500] hover:bg-yellow-300"><Play className="mr-2 h-4 w-4"/>Configure study</Button></div>}
-    <ScenarioPanel open={setupOpen} onClose={()=>setSetupOpen(false)} config={config} setConfig={setConfig} nations={nations} onRun={run} onAi={requestProposal} running={running}/>
+    {!result && !setupOpen && <div className="absolute bottom-5 left-1/2 z-20 w-[calc(100%-2rem)] max-w-xs -translate-x-1/2 md:hidden"><Button onClick={()=>setSetupOpen(true)} className="h-12 w-full rounded-2xl bg-yellow-400 px-5 text-[#181500] hover:bg-yellow-300"><MessageCircle className="mr-2 h-4 w-4"/>Open conversation</Button></div>}
+    <ConversationPanel visible={setupOpen} config={config} setConfig={setConfig} nations={nations} result={result} week={week} running={running} saving={saving} proposal={proposal} proposalLoading={proposalLoading} onRequestProposal={requestProposal} onApplyProposal={applyProposal} onDiscardProposal={()=>setProposal(undefined)} onRun={run} onSave={saveStudy} onShare={share} onOpenStudies={loadLibrary} onShowGlobe={()=>setSetupOpen(false)}/>
     {result && <ResultsSheet result={result} config={config} week={week} setWeek={setWeek} onSave={saveStudy} onShare={share} onSensitivity={runSensitivity} comparison={comparison} saving={saving}/>}
 
     <Dialog open={introOpen} onOpenChange={setIntroOpen}><DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-xl overflow-y-auto rounded-[24px] sm:rounded-[28px] border-white/10 bg-[#0c0c0c] p-0 text-stone-100"><div className="relative h-48 overflow-hidden border-b border-white/8 bg-[#070707]"><div className="atlas-grid absolute inset-0 opacity-50"/><div className="absolute left-1/2 top-1/2 grid h-28 w-28 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-yellow-400/30 bg-yellow-400/[.06]"><Globe2 className="h-10 w-10 text-yellow-300"/></div><div className="absolute bottom-4 left-5 rounded-full border border-white/10 bg-[#0b0b0b] px-3 py-1 text-[9px] uppercase tracking-[.18em] text-stone-400">Inputs → seeded frames → ranges</div></div><div className="p-6"><DialogHeader><DialogTitle className="text-2xl tracking-tight">Explore assumptions, not predictions.</DialogTitle><DialogDescription className="mt-2 leading-relaxed text-stone-400">Sandtable is an educational laboratory for inspecting how aggregate capabilities, terrain, tempo, supply, and uncertainty interact in a simplified deterministic model.</DialogDescription></DialogHeader><div className="mt-5 grid gap-2 sm:grid-cols-3">{[[ShieldCheck,"Non-operational"],[Save,"Reproducible"],[Sparkles,"Reviewable AI"]].map(([Icon,label])=><div key={label as string} className="rounded-2xl border border-white/8 bg-white/[.025] p-3"><Icon className="h-4 w-4 text-yellow-300"/><p className="mt-2 text-xs text-stone-300">{label as string}</p></div>)}</div><Button onClick={()=>{sessionStorage.setItem("sandtable-intro","dismissed");setIntroOpen(false)}} className="mt-5 h-11 w-full rounded-2xl bg-yellow-400 text-[#181500] hover:bg-yellow-300">Enter the laboratory<ChevronRight className="ml-2 h-4 w-4"/></Button></div></DialogContent></Dialog>
 
-    <Dialog open={!!proposal || proposalLoading} onOpenChange={open=>!open&&setProposal(undefined)}><DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto rounded-[24px] sm:rounded-[28px] border-white/10 bg-[#0c0c0c] text-stone-100"><DialogHeader><DialogTitle>{proposalLoading?"Drafting a constrained proposal…":proposal?.title}</DialogTitle><DialogDescription className="text-stone-400">AI output never runs automatically. Review and explicitly apply it.</DialogDescription></DialogHeader>{proposalLoading?<div className="h-44 animate-pulse rounded-2xl bg-white/[.04]"/>:proposal&&<div><p className="rounded-2xl border border-white/8 bg-white/[.025] p-4 text-sm leading-relaxed text-stone-300">{proposal.summary}</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><ProposalCell label="Objective" value={proposal.objective}/><ProposalCell label="Configuration" value={`${proposal.terrain} terrain · ${proposal.tempo} tempo · ${proposal.duration} weeks`}/></div><div className="mt-4"><p className="text-[10px] uppercase tracking-[.18em] text-stone-500">Sensitivity alternatives</p><ul className="mt-2 space-y-1 text-xs text-stone-400">{proposal.alternatives.map(item=><li key={item}>• {item}</li>)}</ul></div><p className="mt-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/[.06] p-3 text-xs text-yellow-100">{proposal.safetyNotice}</p><div className="mt-5 flex justify-end gap-2"><Button variant="ghost" onClick={()=>setProposal(undefined)} className="rounded-xl">Discard</Button><Button onClick={applyProposal} className="rounded-xl bg-yellow-400 text-[#181500] hover:bg-yellow-300">Apply for review</Button></div></div>}</DialogContent></Dialog>
 
     <StudyLibrary open={libraryOpen} onOpenChange={setLibraryOpen} studies={saved} hasActiveResult={!!result} onOpenStudy={openSaved} onOpenRun={openHistoricalRun} onCompareRun={compareHistoricalRun} onDelete={removeSaved}/>
 
@@ -159,4 +159,3 @@ export default function Index() {
 }
 
 function NavButton({icon:Icon,label,onClick}:{icon:typeof FlaskConical;label:string;onClick:()=>void}) { return <Button onClick={onClick} variant="ghost" className="h-10 rounded-xl px-3 text-xs text-stone-400 hover:bg-white/5 hover:text-stone-100"><Icon className="mr-2 h-4 w-4"/>{label}</Button> }
-function ProposalCell({label,value}:{label:string;value:string}) { return <div className="rounded-2xl border border-white/8 bg-white/[.025] p-4"><p className="text-[10px] uppercase tracking-[.18em] text-stone-500">{label}</p><p className="mt-2 text-sm text-stone-200">{value}</p></div> }

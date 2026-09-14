@@ -12,7 +12,7 @@ type SensitivityCase = { label: string; result: SimulationResult };
 type Props = { result: SimulationResult; config: ScenarioConfig; week: number; setWeek: (week: number) => void; onSave: () => void; onShare: () => void; onSensitivity: (kind: "tempo" | "supply" | "uncertainty") => void; comparison?: SensitivityCase; saving: boolean };
 
 export function ResultsSheet({ result, config, week, setWeek, onSave, onShare, onSensitivity, comparison, saving }: Props) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState<SimulationEvent["type"] | "all">("all");
   const events = useMemo(() => result.events.filter(event => event.week <= week && (filter === "all" || event.type === filter)).slice(-6).reverse(), [result, week, filter]);
   const chartData = result.frames.map(frame => ({ week: `W${frame.week}`, A: frame.aStrength, B: frame.bStrength, supplyA: frame.aSupply, supplyB: frame.bSupply }));
@@ -28,7 +28,7 @@ export function ResultsSheet({ result, config, week, setWeek, onSave, onShare, o
     return { turningWeek: turning.week, drivers: [`${config.tempo} tempo shaped weekly supply consumption and interaction intensity.`, `Side ${final.aSupply >= final.bSupply ? "A" : "B"} retained the stronger final supply position (${Math.max(final.aSupply,final.bSupply).toFixed(0)}%).`, `The configured aggregate formation balance was ${formationA} for Side A and ${formationB} for Side B.`, `${config.uncertainty}% configured uncertainty produced a ${result.outcomeA}/${result.outcomeB} ensemble split.`] };
   }, [config,result]);
   return (
-    <section className={`absolute inset-x-1 bottom-1 sm:inset-x-2 sm:bottom-2 z-30 overflow-hidden rounded-[24px] border border-white/10 bg-[#0b0b0b]/96 shadow-[0_-24px_80px_rgba(0,0,0,.35)] backdrop-blur-xl transition-all duration-500 md:inset-x-4 ${expanded ? "h-[calc(100dvh-82px)] md:h-[52vh]" : "h-[82px]"}`} aria-label="Simulation results">
+    <section className={`absolute inset-x-1 bottom-1 z-30 overflow-hidden rounded-[24px] border border-white/10 bg-[#0b0b0b]/96 shadow-[0_-24px_80px_rgba(0,0,0,.35)] backdrop-blur-xl transition-all duration-500 sm:bottom-2 md:left-[438px] md:right-2 lg:left-[468px] ${expanded ? "h-[calc(100dvh-82px)] md:h-[52vh]" : "h-[82px]"}`} aria-label="Simulation results">
       <div className="flex h-[82px] items-center gap-2 border-b border-white/8 px-3 sm:gap-4 sm:px-4 md:px-6">
         <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-yellow-400/12 text-yellow-300"><Sparkles className="h-4 w-4" /></span>
