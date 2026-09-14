@@ -12,7 +12,8 @@ import { HistoricalRun, SavedStudy, StudyLibrary } from "@/components/StudyLibra
 import { UserMenu } from "@/components/UserMenu";
 import { WorldCanvas } from "@/components/WorldCanvas";
 import { supabase } from "@/integrations/supabase/client";
-import { AgentTurn, AssetPool, defaultScenario, fallbackNations, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
+import { buildTurnObservations } from "@/lib/agents";
+import { AgentTurn, AssetPool, DATASET_VERSION, defaultScenario, fallbackNations, MODEL_VERSION, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
 import { runSimulation } from "@/lib/simulation";
 
 export default function Index() {
@@ -28,6 +29,7 @@ export default function Index() {
   const [introOpen, setIntroOpen] = useState(() => sessionStorage.getItem("sandtable-intro") !== "dismissed");
   const [comparison, setComparison] = useState<{ label: string; result: SimulationResult }>();
   const [running, setRunning] = useState(false);
+  const [agentProgress, setAgentProgress] = useState({ current: 0, total: 0 });
   const [replaying, setReplaying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<SavedStudy[]>([]);
@@ -60,26 +62,49 @@ export default function Index() {
   const run = async () => {
     setReplaying(false);
     setRunning(true);
+    setAgentProgress({ current: 0, total: config.duration });
     const nationA = nations.find(nation => nation.code === config.sideA.nationCode);
     const nationB = nations.find(nation => nation.code === config.sideB.nationCode);
     if (!nationA || !nationB) { setRunning(false); toast.error("Choose two national profiles"); return; }
     const profile = (nation:Nation) => ({ code:nation.code, name:nation.name, budget:nation.budget_usd_bn, gdp:nation.gdp_usd_bn, population:nation.population_m, personnel:nation.personnel_k, readiness:nation.readiness_index, datasetVersion:nation.dataset_version, asOfDate:nation.as_of_date });
-    const [agentResponse, poolResponse] = await Promise.all([
-      supabase.functions.invoke("conflict-agents", { body:{ objective:config.objective, duration:config.duration, sideA:profile(nationA), sideB:profile(nationB) } }),
-      supabase.from("asset_pools").select("*").eq("review_status", "approved").in("nation_code", [nationA.code, nationB.code]),
-    ]);
-    if (agentResponse.error || agentResponse.data?.error) {
+    try {
+      const poolResponse = await supabase.from("asset_pools").select("*").eq("review_status", "approved").in("nation_code", [nationA.code, nationB.code]);
+      const runPools = poolResponse.data?.length ? poolResponse.data as AssetPool[] : assetPools;
+      if (poolResponse.data?.length) setAssetPools(current => [...current.filter(pool => pool.nation_code !== nationA.code && pool.nation_code !== nationB.code), ...(poolResponse.data as AssetPool[])]);
+      if (poolResponse.error) toast.warning("Asset pool query unavailable", { description: "The run will use deterministic four-domain pools derived from governed national indicators." });
+
+      const sessionKey = crypto.randomUUID();
+      let sessionId: string | undefined;
+      let turns: AgentTurn[] = [];
+      let adjudicated = runSimulation(config, nations, turns, runPools);
+      const scenario = { name:config.name, seed:config.seed, modelVersion:MODEL_VERSION, datasetVersion:DATASET_VERSION, assetDatasetVersion:adjudicated.assetDatasetVersion ?? "asset-pools-unavailable", configuration:config };
+
+      for (let turnWeek = 1; turnWeek <= config.duration; turnWeek += 1) {
+        setAgentProgress({ current: turnWeek, total: config.duration });
+        const previousTurn = turns.at(-1);
+        const { observationA, observationB } = buildTurnObservations(adjudicated, turnWeek, config.uncertainty, previousTurn);
+        const { data, error } = await supabase.functions.invoke("conflict-agents", { body:{ sessionKey, sessionId, week:turnWeek, duration:config.duration, objective:config.objective, scenario, sideA:{ profile:profile(nationA), observation:observationA }, sideB:{ profile:profile(nationB), observation:observationB } } });
+        if (error || data?.error || !data?.turn?.id || !data?.sessionId) throw new Error(data?.error ?? error?.message ?? `Adaptive turn ${turnWeek} could not be committed.`);
+        sessionId = data.sessionId as string;
+        const committedTurn = data.turn as AgentTurn;
+        const candidateTurns = [...turns, committedTurn];
+        adjudicated = runSimulation(config, nations, candidateTurns, runPools);
+        const resultingFrame = adjudicated.frames[turnWeek];
+        const freeze = await supabase.functions.invoke("agent-turn-freeze", { body:{ sessionId, turnId:committedTurn.id, resultingFrame } });
+        if (freeze.error || freeze.data?.error || !freeze.data?.outcome) throw new Error(freeze.data?.error ?? freeze.error?.message ?? `Adaptive turn ${turnWeek} could not be frozen.`);
+        turns = [...turns, { ...committedTurn, resultingFrame, outcomeHash:freeze.data.outcome.frameHash, frozenAt:freeze.data.outcome.frozenAt }];
+      }
+
+      const completed = runSimulation(config, nations, turns, runPools);
+      const next = { ...completed, agentSessionId: sessionId };
+      setResult(next); setComparison(undefined); setWeek(0); setReplaying(true); setSetupOpen(false); setScenarioId(undefined);
+      toast.success("Adaptive simulation committed", { description:`${config.duration} independent turns were observed, decided, adjudicated, and frozen.` });
+    } catch (error) {
+      toast.error("Adaptive simulation stopped", { description:error instanceof Error?error.message:"The national agents could not complete the run." });
+    } finally {
       setRunning(false);
-      toast.error("National agents could not start", { description:agentResponse.data?.error ?? agentResponse.error?.message ?? "AI service unavailable." });
-      return;
+      setAgentProgress({ current: 0, total: 0 });
     }
-    const runPools = poolResponse.data?.length ? poolResponse.data as AssetPool[] : assetPools;
-    if (poolResponse.data?.length) setAssetPools(current => [...current.filter(pool => pool.nation_code !== nationA.code && pool.nation_code !== nationB.code), ...(poolResponse.data as AssetPool[])]);
-    if (poolResponse.error) toast.warning("Asset pool query unavailable", { description: "The run will use deterministic four-domain pools derived from governed national indicators." });
-    const turns = (agentResponse.data.turns ?? []) as AgentTurn[];
-    const next = runSimulation(config, nations, turns, runPools);
-    setResult(next); setComparison(undefined); setWeek(0); setRunning(false); setReplaying(true); setSetupOpen(false); setScenarioId(undefined);
-    toast.success("Agent simulation started", { description:`${nationA.name} and ${nationB.name} are adapting across ${config.duration} strategic turns.` });
   };
 
   const runSensitivity = (kind: "tempo" | "supply" | "uncertainty") => {
@@ -161,7 +186,7 @@ export default function Index() {
     </header>
 
     {!result && !setupOpen && <div className="absolute bottom-5 left-1/2 z-20 w-[calc(100%-2rem)] max-w-xs -translate-x-1/2 md:hidden"><Button onClick={()=>setSetupOpen(true)} className="stable-action h-12 w-full rounded-2xl bg-yellow-400 px-5 text-[#181500] hover:bg-yellow-300"><MessageCircle className="mr-2 h-4 w-4"/>Open conversation</Button></div>}
-    <AgentSetupPanel visible={setupOpen} config={config} setConfig={setConfig} nations={nations} running={running} onRun={run} onClose={()=>setSetupOpen(false)}/>
+    <AgentSetupPanel visible={setupOpen} config={config} setConfig={setConfig} nations={nations} running={running} progress={agentProgress} onRun={run} onClose={()=>setSetupOpen(false)}/>
     {result && <ResultsSheet result={result} config={config} week={week} setWeek={setWeek} onSave={saveStudy} onShare={share} onSensitivity={runSensitivity} comparison={comparison} saving={saving}/>}
 
     <Dialog open={introOpen} onOpenChange={setIntroOpen}><DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-xl overflow-y-auto rounded-[24px] sm:rounded-[28px] border-white/10 bg-[#0c0c0c] p-0 text-stone-100"><div className="relative h-48 overflow-hidden border-b border-white/8 bg-[#070707]"><div className="atlas-grid absolute inset-0 opacity-50"/><div className="absolute left-1/2 top-1/2 grid h-28 w-28 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-yellow-400/30 bg-yellow-400/[.06]"><Globe2 className="h-10 w-10 text-yellow-300"/></div><div className="absolute bottom-4 left-5 rounded-full border border-white/10 bg-[#0b0b0b] px-3 py-1 text-[9px] uppercase tracking-[.18em] text-stone-400">Inputs → seeded frames → ranges</div></div><div className="p-6"><DialogHeader><DialogTitle className="text-2xl tracking-tight">Explore assumptions, not predictions.</DialogTitle><DialogDescription className="mt-2 leading-relaxed text-stone-400">Sandtable is an educational laboratory for inspecting how aggregate capabilities, terrain, tempo, supply, and uncertainty interact in a simplified deterministic model.</DialogDescription></DialogHeader><div className="mt-5 grid gap-2 sm:grid-cols-3">{[[ShieldCheck,"Non-operational"],[Save,"Reproducible"],[Sparkles,"Reviewable AI"]].map(([Icon,label])=><div key={label as string} className="rounded-2xl border border-white/8 bg-white/[.025] p-3"><Icon className="h-4 w-4 text-yellow-300"/><p className="mt-2 text-xs text-stone-300">{label as string}</p></div>)}</div><Button onClick={()=>{sessionStorage.setItem("sandtable-intro","dismissed");setIntroOpen(false)}} className="mt-5 h-11 w-full rounded-2xl bg-yellow-400 text-[#181500] hover:bg-yellow-300">Enter the laboratory<ChevronRight className="ml-2 h-4 w-4"/></Button></div></DialogContent></Dialog>

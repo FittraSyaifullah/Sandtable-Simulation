@@ -95,19 +95,44 @@ export type AgentDecision = {
   stance: "hold" | "cautious" | "balanced" | "press";
   priority: "logistics" | "readiness" | "resilience" | "diplomacy";
   rationale: string;
+  expectedEffect?: string;
+  confidence?: number;
+};
+
+export type AgentObservation = {
+  week: number;
+  ownStrength: number;
+  ownSupply: number;
+  objectiveState: "advantage" | "disadvantage" | "contested";
+  observedOpponentStrength: number;
+  observedOpponentSupply: number;
+  ownDomains: DomainScores;
+  uncertainty: number;
+  previousDecision?: Pick<AgentDecision, "stance" | "priority">;
 };
 
 export type AgentTurn = {
+  id?: string;
   week: number;
   sideA: AgentDecision;
   sideB: AgentDecision;
   assessment: string;
+  observationA?: AgentObservation;
+  observationB?: AgentObservation;
+  inputHash?: string;
+  models?: { sideA: string; sideB: string };
+  modes?: { sideA: "openai" | "deterministic_fallback"; sideB: "openai" | "deterministic_fallback" };
+  committedAt?: string;
+  resultingFrame?: WeeklyFrame;
+  outcomeHash?: string;
+  frozenAt?: string;
 };
 
 export type SimulationResult = {
   modelVersion: string;
   datasetVersion: string;
   assetDatasetVersion?: string;
+  agentSessionId?: string;
   seed: string;
   runKey: string;
   confidence: "moderate" | "low";

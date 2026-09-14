@@ -183,7 +183,8 @@ export function runSimulation(config: ScenarioConfig, nations: Nation[], agentTu
   const lossesA = samples.map(sample => sample.lossA);
   const lossesB = samples.map(sample => sample.lossB);
   const assetEvidenceKey = relevantPools.map(pool => ({ id: pool.id, version: pool.version_id, inventory: [pool.inventory_low, pool.inventory_estimate, pool.inventory_high], availability: [pool.availability_low, pool.availability_high], readiness: [pool.readiness_low, pool.readiness_high], sustainment: pool.sustainment_index, repair: pool.repair_rate, replacement: pool.replacement_rate })).sort((a, b) => a.id.localeCompare(b.id));
-  const configKey = JSON.stringify({ config, agentTurns, nationInputs: [nationA, nationB], assetEvidenceKey });
+  const frozenDecisionKey = agentTurns.map(turn => ({ week:turn.week, sideA:turn.sideA, sideB:turn.sideB, observationA:turn.observationA, observationB:turn.observationB, models:turn.models, modes:turn.modes }));
+  const configKey = JSON.stringify({ config, frozenDecisionKey, nationInputs: [nationA, nationB], assetEvidenceKey });
   const versions = [...new Set(relevantPools.map(pool => pool.version_id))].sort();
   const assetDatasetVersion = versions.length ? versions.join("+") : `${ASSET_DATASET_VERSION}:derived-fallback`;
   return {
@@ -204,7 +205,7 @@ export function runSimulation(config: ScenarioConfig, nations: Nation[], agentTu
     frames: canonical.frames,
     events: canonical.events,
     agentTurns,
-    assumptions: [relevantPools.length ? "Only approved pools from the active versioned asset dataset inform domain capability." : "Approved asset pools were unavailable; four domain pools were deterministically derived from governed national indicators.", "Land, air, maritime, and support are calculated independently, then weighted by terrain and configured aggregate formations.", "Inventory ranges, availability, readiness, sustainment, repair, and replacement are modeled as auditable aggregate inputs.", "AI agents choose bounded strategic stance and resilience priorities; they do not generate operational plans.", `${ENSEMBLE_SAMPLES} deterministic sample seeds produce the displayed ranges.`],
+    assumptions: [relevantPools.length ? "Only approved pools from the active versioned asset dataset inform domain capability." : "Approved asset pools were unavailable; four domain pools were deterministically derived from governed national indicators.", "Land, air, maritime, and support are calculated independently, then weighted by terrain and configured aggregate formations.", "Inventory ranges, availability, readiness, sustainment, repair, and replacement are modeled as auditable aggregate inputs.", "Each bounded AI agent observes the preceding aggregate frame, decides independently, and is committed before deterministic adjudication.", "Frozen decision content—not invocation IDs or timestamps—is included in the reproducible run key.", `${ENSEMBLE_SAMPLES} deterministic sample seeds produce the displayed ranges.`],
     limitations: ["Illustrative model output—not a forecast, intelligence assessment, or operational recommendation.", "Live intelligence, weapons employment, target selection, attack routes, and real unit locations are excluded.", "Aggregate asset pools and model-generated agent choices cannot represent tactical context or establish predictive validity."],
   };
 }

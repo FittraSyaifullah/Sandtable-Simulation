@@ -1,13 +1,13 @@
-import { ChevronDown, Globe2, Play, ShieldCheck } from "lucide-react";
+import { ChevronDown, Globe2, LoaderCircle, Play, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Nation, ScenarioConfig } from "@/lib/sandtable";
 
-type Props = { visible:boolean; config:ScenarioConfig; setConfig:(config:ScenarioConfig)=>void; nations:Nation[]; running:boolean; onRun:()=>void; onClose:()=>void };
+type Props = { visible:boolean; config:ScenarioConfig; setConfig:(config:ScenarioConfig)=>void; nations:Nation[]; running:boolean; progress:{current:number;total:number}; onRun:()=>void; onClose:()=>void };
 
-export function AgentSetupPanel({visible,config,setConfig,nations,running,onRun,onClose}:Props) {
+export function AgentSetupPanel({visible,config,setConfig,nations,running,progress,onRun,onClose}:Props) {
   const patch = <K extends keyof ScenarioConfig>(key:K,value:ScenarioConfig[K]) => setConfig({...config,[key]:value});
   const patchSide = (side:"sideA"|"sideB",nationCode:string) => setConfig({...config,[side]:{...config[side],nationCode}});
   const selectedA=nations.find(nation=>nation.code===config.sideA.nationCode);
@@ -21,9 +21,9 @@ export function AgentSetupPanel({visible,config,setConfig,nations,running,onRun,
       <label className="mt-6 block"><span className="mb-2 block text-[10px] uppercase tracking-[.14em] text-stone-600">Strategic scenario</span><Textarea value={config.objective} onChange={event=>patch("objective",event.target.value)} placeholder="Describe a bounded future strategic objective…" className="min-h-28 resize-none rounded-2xl border-white/10 bg-black/35 p-4 text-sm leading-relaxed text-stone-200 placeholder:text-stone-700"/></label>
       <div className="mt-7 space-y-6"><Range label="Duration" value={config.duration} min={4} max={24} suffix=" weeks" onChange={value=>patch("duration",value)}/><Range label="Uncertainty" value={config.uncertainty} min={10} max={90} suffix="%" onChange={value=>patch("uncertainty",value)}/></div>
       <details className="group mt-7 rounded-2xl border border-white/8 bg-black/25"><summary className="flex h-12 cursor-pointer list-none items-center justify-between px-4 text-[10px] uppercase tracking-[.14em] text-stone-500">Model assumptions<ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180"/></summary><div className="grid grid-cols-2 gap-3 border-t border-white/8 p-4"><Choice label="Terrain" value={config.terrain} options={["open","mixed","restricted","maritime"]} onChange={value=>patch("terrain",value as ScenarioConfig["terrain"])}/><Choice label="Tempo" value={config.tempo} options={["measured","standard","intense"]} onChange={value=>patch("tempo",value as ScenarioConfig["tempo"])}/></div></details>
-      <div className="mt-6 flex gap-3 rounded-2xl border border-yellow-400/15 bg-yellow-400/[.04] p-4"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-yellow-300"/><p className="text-[10px] leading-relaxed text-stone-500">Versioned public macro data{asOf?` · as of ${new Date(asOf).toLocaleDateString()}`:""}. No live intelligence, target selection, weapon guidance, attack routes, or real-unit locations.</p></div>
+      <div className="mt-6 flex gap-3 rounded-2xl border border-yellow-400/15 bg-yellow-400/[.04] p-4"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-yellow-300"/><p className="text-[10px] leading-relaxed text-stone-500">Each agent observes the previous aggregate frame, decides independently, and is committed with its opponent before deterministic adjudication. Versioned public data only{asOf?` · as of ${new Date(asOf).toLocaleDateString()}`:""}.</p></div>
     </div>
-    <div className="border-t border-white/8 bg-[#090909] p-4"><Button onClick={onRun} disabled={running||!config.objective.trim()} className="stable-action h-13 w-full rounded-2xl bg-yellow-400 text-sm font-semibold text-[#181500] hover:bg-yellow-300"><Play className="mr-2 h-4 w-4 fill-current"/>{running?"Starting national agents…":"Run agent simulation"}</Button></div>
+    <div className="border-t border-white/8 bg-[#090909] p-4">{running&&progress.total>0&&<div className="mb-3"><div className="mb-1.5 flex justify-between text-[9px] uppercase tracking-[.14em] text-stone-600"><span>Observe → commit → adjudicate</span><span>{progress.current}/{progress.total}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-white/8"><div className="h-full rounded-full bg-yellow-400 transition-[width] duration-300" style={{width:`${progress.current/progress.total*100}%`}}/></div></div>}<Button onClick={onRun} disabled={running||!config.objective.trim()} className="stable-action h-13 w-full rounded-2xl bg-yellow-400 text-sm font-semibold text-[#181500] hover:bg-yellow-300">{running?<LoaderCircle className="mr-2 h-4 w-4 animate-spin"/>:<Play className="mr-2 h-4 w-4 fill-current"/>}{running?`Committing turn ${progress.current || 1} of ${progress.total || config.duration}…`:"Run adaptive simulation"}</Button></div>
   </aside>;
 }
 
