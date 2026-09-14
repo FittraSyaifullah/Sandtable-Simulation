@@ -64,6 +64,19 @@ export type WeeklyFrame = {
   control: "A" | "B" | "contested";
 };
 
+export type AgentDecision = {
+  stance: "hold" | "cautious" | "balanced" | "press";
+  priority: "logistics" | "readiness" | "resilience" | "diplomacy";
+  rationale: string;
+};
+
+export type AgentTurn = {
+  week: number;
+  sideA: AgentDecision;
+  sideB: AgentDecision;
+  assessment: string;
+};
+
 export type SimulationResult = {
   modelVersion: string;
   datasetVersion: string;
@@ -79,6 +92,7 @@ export type SimulationResult = {
   lossRangeB: [number, number];
   frames: WeeklyFrame[];
   events: SimulationEvent[];
+  agentTurns?: AgentTurn[];
   assumptions: string[];
   limitations: string[];
 };

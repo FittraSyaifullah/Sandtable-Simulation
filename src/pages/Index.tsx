@@ -5,17 +5,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ConversationPanel, ConversationProposal } from "@/components/ConversationPanel";
+import { AgentSetupPanel } from "@/components/AgentSetupPanel";
 import { ResultsSheet } from "@/components/ResultsSheet";
 import { CalibrationCase, MethodDialog } from "@/components/MethodDialog";
 import { HistoricalRun, SavedStudy, StudyLibrary } from "@/components/StudyLibrary";
 import { UserMenu } from "@/components/UserMenu";
 import { WorldCanvas } from "@/components/WorldCanvas";
 import { supabase } from "@/integrations/supabase/client";
-import { defaultScenario, fallbackNations, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
+import { AgentTurn, defaultScenario, fallbackNations, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
 import { runSimulation } from "@/lib/simulation";
-
-type Proposal = ConversationProposal;
 
 export default function Index() {
   const navigate = useNavigate();
@@ -27,8 +25,6 @@ export default function Index() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [methodOpen, setMethodOpen] = useState(false);
   const [introOpen, setIntroOpen] = useState(() => sessionStorage.getItem("sandtable-intro") !== "dismissed");
-  const [proposal, setProposal] = useState<Proposal>();
-  const [proposalLoading, setProposalLoading] = useState(false);
   const [comparison, setComparison] = useState<{ label: string; result: SimulationResult }>();
   const [running, setRunning] = useState(false);
   const [replaying, setReplaying] = useState(false);
@@ -57,14 +53,23 @@ export default function Index() {
     return () => window.clearTimeout(timer);
   }, [replaying, result, week]);
 
-  const run = () => {
+  const run = async () => {
     setReplaying(false);
     setRunning(true);
-    window.setTimeout(() => {
-      const next = runSimulation(config, nations);
-      setResult(next); setComparison(undefined); setWeek(0); setRunning(false); setReplaying(true); setSetupOpen(false); setScenarioId(undefined);
-      toast.success("Simulation resolved", { description: "The canonical replay is now moving across the globe." });
-    }, 420);
+    const nationA = nations.find(nation => nation.code === config.sideA.nationCode);
+    const nationB = nations.find(nation => nation.code === config.sideB.nationCode);
+    if (!nationA || !nationB) { setRunning(false); toast.error("Choose two national profiles"); return; }
+    const profile = (nation:Nation) => ({ code:nation.code, name:nation.name, budget:nation.budget_usd_bn, gdp:nation.gdp_usd_bn, population:nation.population_m, personnel:nation.personnel_k, readiness:nation.readiness_index, datasetVersion:nation.dataset_version, asOfDate:nation.as_of_date });
+    const { data, error } = await supabase.functions.invoke("conflict-agents", { body:{ objective:config.objective, duration:config.duration, sideA:profile(nationA), sideB:profile(nationB) } });
+    if (error || data?.error) {
+      setRunning(false);
+      toast.error("National agents could not start", { description:data?.error ?? error?.message ?? "AI service unavailable." });
+      return;
+    }
+    const turns = (data.turns ?? []) as AgentTurn[];
+    const next = runSimulation(config, nations, turns);
+    setResult(next); setComparison(undefined); setWeek(0); setRunning(false); setReplaying(true); setSetupOpen(false); setScenarioId(undefined);
+    toast.success("Agent simulation started", { description:`${nationA.name} and ${nationB.name} are adapting across ${config.duration} strategic turns.` });
   };
 
   const runSensitivity = (kind: "tempo" | "supply" | "uncertainty") => {
@@ -133,34 +138,20 @@ export default function Index() {
     if (error) toast.error("Study could not be deleted"); else { setSaved(current => current.filter(row => row.id !== item.id)); toast.success("Study deleted"); }
   };
 
-  const requestProposal = async (prompt: string) => {
-    setProposalLoading(true);
-    const { data, error } = await supabase.functions.invoke("scenario-draft", { body: { prompt } });
-    setProposalLoading(false);
-    if (error || data?.error) toast.error("Proposal rejected", { description: data?.error ?? error?.message });
-    else setProposal(data as Proposal);
-  };
-
-  const applyProposal = () => {
-    if (!proposal) return;
-    setConfig(current => ({ ...current, name: proposal.title, objective: proposal.objective, terrain: proposal.terrain, tempo: proposal.tempo, duration: proposal.duration, uncertainty: proposal.uncertainty, sideA: { ...current.sideA, formations: proposal.formations?.sideA ?? current.sideA.formations }, sideB: { ...current.sideB, formations: proposal.formations?.sideB ?? current.sideB.formations } }));
-    setProposal(undefined); toast.success("Proposal applied for review", { description: "Settings and aggregate formations are ready for review; no simulation has run." });
-  };
-
   return <main className="relative h-[100dvh] min-h-0 overflow-hidden bg-[#050505] text-stone-100">
-    <WorldCanvas config={config} nations={nations} frame={activeFrame} events={result?.events} week={week}/>
+    <WorldCanvas config={config} nations={nations} frame={activeFrame} events={result?.events} week={week} panelOpen={setupOpen}/>
     <header className="absolute inset-x-0 top-0 z-50 flex h-[76px] items-center gap-2 border-b border-white/8 bg-[#050505]/88 px-3 backdrop-blur-xl sm:gap-3 md:px-5">
       <button onClick={() => setSetupOpen(true)} className="flex shrink-0 items-center gap-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400"><span className="grid h-10 w-10 place-items-center rounded-2xl border border-yellow-400/30 bg-yellow-400/10"><Globe2 className="h-5 w-5 text-yellow-300"/></span><span className="hidden text-left sm:block"><span className="block text-[15px] font-semibold tracking-tight">Sandtable</span><span className="block text-[8px] uppercase tracking-[.2em] text-stone-600">Scenario laboratory</span></span></button>
       <div className="mx-1 hidden h-7 w-px bg-white/10 sm:block"/><div className="hidden min-w-0 flex-1 sm:block"><p className="truncate text-xs font-medium text-stone-300">{config.name}</p><p className="mt-0.5 truncate text-[9px] uppercase tracking-[.12em] text-stone-600">{config.regionLabel} · {result?"Run complete":"Draft"}</p></div>
       <div className="flex-1 sm:hidden"/>
       <div className="hidden rounded-full border border-emerald-500/20 bg-emerald-500/[.06] px-3 py-1.5 text-[9px] text-emerald-300 xl:block"><span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"/>Model ready · v0.3</div>
-      <Button onClick={()=>setSetupOpen(value=>!value)} size="icon" variant="ghost" className="h-11 w-11 shrink-0 rounded-xl text-stone-400 md:hidden" aria-label={setupOpen?"Show map":"Show scenario workflow"}>{setupOpen?<Globe2 className="h-5 w-5"/>:<MessageCircle className="h-5 w-5"/>}</Button>
+      <Button onClick={()=>setSetupOpen(value=>!value)} size="icon" variant="ghost" className="h-11 w-11 shrink-0 rounded-xl text-stone-400 hover:bg-white/[.06] hover:text-stone-100" aria-label={setupOpen?"Show map":"Configure scenario"}>{setupOpen?<Globe2 className="h-5 w-5"/>:<MessageCircle className="h-5 w-5"/>}</Button>
       <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-11 shrink-0 rounded-xl border border-white/8 bg-white/[.025] px-3 text-stone-400 hover:bg-white/[.06] hover:text-stone-100" aria-label="Open workspace resources"><BookOpen className="h-4 w-4"/><span className="ml-2 hidden text-xs md:inline">Resources</span><ChevronDown className="ml-2 hidden h-3.5 w-3.5 text-stone-600 md:inline"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#0c0c0c] p-2 text-stone-200"><DropdownMenuItem onSelect={loadLibrary} className="h-12 rounded-xl text-xs focus:bg-white/8 focus:text-white"><Archive className="mr-3 h-4 w-4 text-yellow-300"/><span><span className="block">Saved studies</span><span className="mt-0.5 block text-[9px] text-stone-600">Open runs and comparisons</span></span></DropdownMenuItem><DropdownMenuItem onSelect={()=>setMethodOpen(true)} className="h-12 rounded-xl text-xs focus:bg-white/8 focus:text-white"><BookOpen className="mr-3 h-4 w-4 text-yellow-300"/><span><span className="block">Method & evidence</span><span className="mt-0.5 block text-[9px] text-stone-600">Inspect model provenance</span></span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
       <UserMenu />
     </header>
 
     {!result && !setupOpen && <div className="absolute bottom-5 left-1/2 z-20 w-[calc(100%-2rem)] max-w-xs -translate-x-1/2 md:hidden"><Button onClick={()=>setSetupOpen(true)} className="stable-action h-12 w-full rounded-2xl bg-yellow-400 px-5 text-[#181500] hover:bg-yellow-300"><MessageCircle className="mr-2 h-4 w-4"/>Open conversation</Button></div>}
-    <ConversationPanel visible={setupOpen} config={config} setConfig={setConfig} nations={nations} result={result} week={week} running={running} saving={saving} proposal={proposal} proposalLoading={proposalLoading} onRequestProposal={requestProposal} onApplyProposal={applyProposal} onDiscardProposal={()=>setProposal(undefined)} onRun={run} onSave={saveStudy} onShare={share} onOpenStudies={loadLibrary} onShowGlobe={()=>setSetupOpen(false)}/>
+    <AgentSetupPanel visible={setupOpen} config={config} setConfig={setConfig} nations={nations} running={running} onRun={run} onClose={()=>setSetupOpen(false)}/>
     {result && <ResultsSheet result={result} config={config} week={week} setWeek={setWeek} onSave={saveStudy} onShare={share} onSensitivity={runSensitivity} comparison={comparison} saving={saving}/>}
 
     <Dialog open={introOpen} onOpenChange={setIntroOpen}><DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-xl overflow-y-auto rounded-[24px] sm:rounded-[28px] border-white/10 bg-[#0c0c0c] p-0 text-stone-100"><div className="relative h-48 overflow-hidden border-b border-white/8 bg-[#070707]"><div className="atlas-grid absolute inset-0 opacity-50"/><div className="absolute left-1/2 top-1/2 grid h-28 w-28 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-yellow-400/30 bg-yellow-400/[.06]"><Globe2 className="h-10 w-10 text-yellow-300"/></div><div className="absolute bottom-4 left-5 rounded-full border border-white/10 bg-[#0b0b0b] px-3 py-1 text-[9px] uppercase tracking-[.18em] text-stone-400">Inputs → seeded frames → ranges</div></div><div className="p-6"><DialogHeader><DialogTitle className="text-2xl tracking-tight">Explore assumptions, not predictions.</DialogTitle><DialogDescription className="mt-2 leading-relaxed text-stone-400">Sandtable is an educational laboratory for inspecting how aggregate capabilities, terrain, tempo, supply, and uncertainty interact in a simplified deterministic model.</DialogDescription></DialogHeader><div className="mt-5 grid gap-2 sm:grid-cols-3">{[[ShieldCheck,"Non-operational"],[Save,"Reproducible"],[Sparkles,"Reviewable AI"]].map(([Icon,label])=><div key={label as string} className="rounded-2xl border border-white/8 bg-white/[.025] p-3"><Icon className="h-4 w-4 text-yellow-300"/><p className="mt-2 text-xs text-stone-300">{label as string}</p></div>)}</div><Button onClick={()=>{sessionStorage.setItem("sandtable-intro","dismissed");setIntroOpen(false)}} className="mt-5 h-11 w-full rounded-2xl bg-yellow-400 text-[#181500] hover:bg-yellow-300">Enter the laboratory<ChevronRight className="ml-2 h-4 w-4"/></Button></div></DialogContent></Dialog>

@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { MapboxStatus, MapboxWorld, MapboxWorldHandle } from "@/components/MapboxWorld";
 import { Nation, ScenarioConfig, SimulationEvent, WeeklyFrame } from "@/lib/sandtable";
 
-type Props = { config: ScenarioConfig; nations: Nation[]; frame?: WeeklyFrame; events?: SimulationEvent[]; week: number };
+type Props = { config: ScenarioConfig; nations: Nation[]; frame?: WeeklyFrame; events?: SimulationEvent[]; week: number; panelOpen:boolean };
 type FormationKind = keyof ScenarioConfig["sideA"]["formations"];
 type Selection = { side: "A" | "B"; kind: FormationKind };
 const kindIcons = { land: LocateFixed, air: Plane, naval: Ship, support: Truck };
 
-export function WorldCanvas({ config, nations, frame, events = [], week }: Props) {
+export function WorldCanvas({ config, nations, frame, events = [], week, panelOpen }: Props) {
   const [selected, setSelected] = useState<Selection>();
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
@@ -41,7 +41,7 @@ export function WorldCanvas({ config, nations, frame, events = [], week }: Props
   const reset = () => { if (mapStatus === "ready") mapRef.current?.reset(); else setZoom(1); };
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-atlas md:left-[480px] lg:left-[520px]">
+    <div className={`absolute inset-0 overflow-hidden bg-atlas transition-[left] duration-300 ${panelOpen?"md:left-[420px]":"md:left-0"}`}>
       <MapboxWorld ref={mapRef} sideA={a} sideB={b} config={config} frame={frame} onSelect={setSelected} onStatusChange={setMapStatus} />
       {mapStatus !== "ready" && <FallbackGlobe zoom={zoom} aX={aX} bX={bX} formations={formations} selected={selected} onSelect={setSelected} />}
       {showGrid && <div className="atlas-grid pointer-events-none absolute inset-0 opacity-30" />}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, CircleDot, PackageOpen, Route, Sparkles, Target } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AgentTimeline } from "@/components/AgentTimeline";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,7 +29,9 @@ export function ResultsSheet({ result, config, week, setWeek, onSave, onShare, o
     return { turningWeek: turning.week, drivers: [`${config.tempo} tempo shaped weekly supply consumption and interaction intensity.`, `Side ${final.aSupply >= final.bSupply ? "A" : "B"} retained the stronger final supply position (${Math.max(final.aSupply,final.bSupply).toFixed(0)}%).`, `The configured aggregate formation balance was ${formationA} for Side A and ${formationB} for Side B.`, `${config.uncertainty}% configured uncertainty produced a ${result.outcomeA}/${result.outcomeB} ensemble split.`] };
   }, [config,result]);
   return (
-    <section className={`absolute inset-x-1 bottom-1 z-30 overflow-hidden rounded-[24px] border border-white/10 bg-[#0b0b0b]/96 shadow-[0_-24px_80px_rgba(0,0,0,.35)] backdrop-blur-xl transition-all duration-500 sm:bottom-2 md:left-[488px] md:right-2 lg:left-[528px] ${expanded ? "h-[calc(100dvh-82px)] md:h-[52vh]" : "h-[82px]"}`} aria-label="Simulation results">
+    <>
+    <AgentTimeline result={result} config={config} week={week} onWeekChange={setWeek}/>
+    <section className={`absolute inset-x-1 bottom-1 z-30 overflow-hidden rounded-[24px] border border-white/10 bg-[#0b0b0b]/96 shadow-[0_-24px_80px_rgba(0,0,0,.35)] backdrop-blur-xl transition-all duration-500 sm:bottom-2 md:left-2 md:right-2 ${expanded ? "h-[calc(100dvh-82px)] md:h-[52vh]" : "h-[82px]"}`} aria-label="Simulation results">
       <div className="flex h-[82px] items-center gap-2 border-b border-white/8 px-3 sm:gap-4 sm:px-4 md:px-6">
         <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-yellow-400/12 text-yellow-300"><Sparkles className="h-4 w-4" /></span>
@@ -53,6 +56,7 @@ export function ResultsSheet({ result, config, week, setWeek, onSave, onShare, o
         </Tabs>
       </div>}
     </section>
+    </>
   );
 }
 function Metric({label,value,note,accent=false}:{label:string;value:string;note:string;accent?:boolean}) { return <div className="rounded-2xl border border-white/8 bg-white/[.025] p-4"><p className="text-[10px] uppercase tracking-[.14em] text-stone-500">{label}</p><p className={`mt-2 text-3xl font-semibold ${accent?"text-yellow-200":"text-stone-100"}`}>{value}</p><p className="mt-1 text-[11px] text-stone-500">{note}</p></div> }

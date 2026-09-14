@@ -30,7 +30,7 @@ export function ConversationPanel(props:Props) {
 
   useEffect(() => { if (result || running) setFlowStep(2); }, [result, running]);
 
-  return <aside className={`absolute left-0 top-[76px] z-40 flex w-full flex-col border-r border-white/10 bg-[#080808]/98 shadow-[24px_0_70px_rgba(0,0,0,.32)] backdrop-blur-xl transition-[transform,bottom] duration-300 md:bottom-0 md:w-[480px] md:translate-x-0 lg:w-[520px] ${result?"bottom-[84px]":"bottom-0"} ${visible?"translate-x-0":"-translate-x-full"}`} aria-label="Sandtable conversation">
+  return <aside className={`absolute left-0 top-[76px] z-40 flex w-full flex-col border-r border-white/10 bg-[#080808]/98 shadow-[24px_0_70px_rgba(0,0,0,.32)] backdrop-blur-xl transition-[transform,bottom] duration-300 md:bottom-0 md:w-[480px] lg:w-[520px] ${result?"bottom-[84px]":"bottom-0"} ${visible?"translate-x-0":"-translate-x-full"}`} aria-label="Sandtable conversation">
     <div className="shrink-0 border-b border-white/8 px-4 pb-4 pt-4 sm:px-6">
       <div className="flex items-center justify-between gap-4">
         <div><p className="text-[9px] uppercase tracking-[.18em] text-yellow-300">Scenario workspace</p><h2 className="mt-1 text-lg font-semibold tracking-tight text-stone-100">Shape the study</h2></div>
