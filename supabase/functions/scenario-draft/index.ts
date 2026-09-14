@@ -38,7 +38,7 @@ serve(async (req) => {
     const payload = await response.json();
     const proposal = JSON.parse(payload.choices[0].message.content);
     console.info("[scenario-draft] Structured proposal generated", { title: proposal.title });
-    return json(proposal, 200);
+    return json({ ...proposal, formations: defaultFormations() }, 200);
   } catch (error) {
     console.error("[scenario-draft] Request failed", { error: error instanceof Error ? error.message : "Unknown error" });
     return json({ error: "The proposal could not be generated." }, 500);
@@ -49,7 +49,11 @@ function guidedDraft(prompt: string) {
   const lower = prompt.toLowerCase();
   const terrain = lower.includes("sea") || lower.includes("maritime") ? "maritime" : lower.includes("mountain") || lower.includes("urban") ? "restricted" : "mixed";
   const tempo = lower.includes("rapid") || lower.includes("intense") ? "intense" : lower.includes("slow") || lower.includes("measured") ? "measured" : "standard";
-  return { title: "AI-assisted abstract access study", summary: prompt, objective: "Sustain aggregate control of a shared abstract access zone", terrain, tempo, duration: 12, uncertainty: 48, assumptions: ["All locations and formations are abstract.", "Capability inputs remain aggregate and versioned.", "The deterministic seed is reviewable before running."], alternatives: ["Reduce tempo to test supply sensitivity.", "Increase uncertainty to inspect range stability."], safetyNotice: "Educational model output only—not a forecast or operational recommendation." };
+  return { title: "AI-assisted abstract access study", summary: prompt, objective: "Sustain aggregate control of a shared abstract access zone", terrain, tempo, duration: 12, uncertainty: 48, formations: defaultFormations(), assumptions: ["All locations and formations are abstract.", "Capability inputs remain aggregate and versioned.", "The deterministic seed is reviewable before running."], alternatives: ["Reduce tempo to test supply sensitivity.", "Increase uncertainty to inspect range stability."], safetyNotice: "Educational model output only—not a forecast or operational recommendation." };
+}
+
+function defaultFormations() {
+  return { sideA: { land: 4, air: 3, naval: 2, support: 2 }, sideB: { land: 4, air: 3, naval: 2, support: 2 } };
 }
 
 function json(body: unknown, status: number) {

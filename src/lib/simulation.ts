@@ -34,6 +34,9 @@ function resolve(config: ScenarioConfig, nationA: Nation, nationB: Nation, sampl
   const tempoFactor = { measured: .78, standard: 1, intense: 1.24 }[config.tempo];
   const postureA = { defensive: .93, balanced: 1, assertive: 1.1 }[config.sideA.posture];
   const postureB = { defensive: .93, balanced: 1, assertive: 1.1 }[config.sideB.posture];
+  const formationPower = (formations: ScenarioConfig["sideA"]["formations"]) => Math.max(.45, (formations.land * 1.05 + formations.air * 1.18 + formations.naval * (config.terrain === "maritime" ? 1.35 : .72) + formations.support * .6) / 10);
+  const formationA = formationPower(config.sideA.formations);
+  const formationB = formationPower(config.sideB.formations);
   let aStrength = 100;
   let bStrength = 100;
   let aSupply = config.sideA.supply;
@@ -57,8 +60,8 @@ function resolve(config: ScenarioConfig, nationA: Nation, nationB: Nation, sampl
         const uncertainty = config.uncertainty / 100;
         const noiseA = 1 + (random() - .5) * uncertainty;
         const noiseB = 1 + (random() - .5) * uncertainty;
-        const powerA = capability(nationA) * config.sideA.allocation / 100 * postureA * terrainFactor * (aSupply / 100) * noiseA;
-        const powerB = capability(nationB) * config.sideB.allocation / 100 * postureB / terrainFactor * (bSupply / 100) * noiseB;
+        const powerA = capability(nationA) * config.sideA.allocation / 100 * postureA * terrainFactor * formationA * (aSupply / 100) * noiseA;
+        const powerB = capability(nationB) * config.sideB.allocation / 100 * postureB / terrainFactor * formationB * (bSupply / 100) * noiseB;
         const total = Math.max(1, powerA + powerB);
         aStrength = Math.max(2, aStrength - tempoFactor * (2.2 + 7 * powerB / total));
         bStrength = Math.max(2, bStrength - tempoFactor * (2.2 + 7 * powerA / total));
