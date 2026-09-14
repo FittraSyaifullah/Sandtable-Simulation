@@ -36,9 +36,9 @@
 
 @layer components {
   .control { @apply h-10 rounded-xl border-white/10 bg-white/[.035] text-xs text-stone-200 shadow-none placeholder:text-stone-600 focus:ring-yellow-400/30; }
-  .conversation-control { @apply h-10 rounded-xl border-white/10 bg-black/30 text-xs text-stone-200 shadow-none focus:ring-yellow-400/30; }
+  .conversation-control { @apply h-11 rounded-xl border-white/10 bg-black/30 text-xs text-stone-200 shadow-none focus:ring-yellow-400/30; }
   .stable-action { @apply shrink-0 select-none whitespace-nowrap; font-variant-numeric: tabular-nums; }
-  .conversation-scroll { scrollbar-gutter: stable; }
+  .conversation-scroll { scrollbar-gutter: stable; scroll-behavior: smooth; }
   .atlas-grid {
     background-color: transparent;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M0 36h72M36 0v72' fill='none' stroke='%23ffffff' stroke-opacity='.045' stroke-width='.5'/%3E%3Ccircle cx='36' cy='36' r='1' fill='%23facc15' fill-opacity='.14'/%3E%3C/svg%3E");

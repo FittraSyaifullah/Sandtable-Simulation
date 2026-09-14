@@ -34,7 +34,7 @@ export function WorldCanvas({ config, nations, frame, events = [], week }: Props
   ]).filter(item => item.count > 0);
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-atlas md:left-[430px] lg:left-[460px]">
+    <div className="absolute inset-0 overflow-hidden bg-atlas md:left-[480px] lg:left-[520px]">
       {showGrid && <div className="absolute inset-0 atlas-grid opacity-50" />}
       <div style={{ scale: zoom }} className="absolute left-1/2 top-[47%] aspect-square w-[min(76vw,76vh)] max-w-[82%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] shadow-[0_0_90px_rgba(250,204,21,.08)] transition-transform duration-300">
         <svg className="h-full w-full" viewBox="0 0 100 100" role="img" aria-label="Abstract globe showing aggregate formations">
