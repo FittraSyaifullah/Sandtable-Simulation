@@ -31,6 +31,7 @@ export default function Index() {
   const [proposalLoading, setProposalLoading] = useState(false);
   const [comparison, setComparison] = useState<{ label: string; result: SimulationResult }>();
   const [running, setRunning] = useState(false);
+  const [replaying, setReplaying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<SavedStudy[]>([]);
   const [calibrationCases, setCalibrationCases] = useState<CalibrationCase[]>([]);
@@ -46,12 +47,23 @@ export default function Index() {
     supabase.from("calibration_cases").select("*").eq("lifecycle_status","active").then(({ data }) => setCalibrationCases((data ?? []) as CalibrationCase[]));
   }, []);
 
+  useEffect(() => {
+    if (!replaying || !result) return;
+    if (week >= result.frames.length - 1) {
+      setReplaying(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setWeek(current => Math.min(current + 1, result.frames.length - 1)), 620);
+    return () => window.clearTimeout(timer);
+  }, [replaying, result, week]);
+
   const run = () => {
+    setReplaying(false);
     setRunning(true);
     window.setTimeout(() => {
       const next = runSimulation(config, nations);
-      setResult(next); setComparison(undefined); setWeek(config.duration); setRunning(false); setSetupOpen(true); setScenarioId(undefined);
-      toast.success("Simulation resolved", { description: "Canonical replay and 240-sample range are ready." });
+      setResult(next); setComparison(undefined); setWeek(0); setRunning(false); setReplaying(true); setSetupOpen(false); setScenarioId(undefined);
+      toast.success("Simulation resolved", { description: "The canonical replay is now moving across the globe." });
     }, 420);
   };
 
@@ -102,11 +114,11 @@ export default function Index() {
   };
 
   const openSaved = (item: SavedStudy) => {
-    setConfig(item.configuration); setResult(item.latest_result ?? undefined); setComparison(undefined); setWeek(item.latest_result?.frames.length ? item.latest_result.frames.length - 1 : 0); setScenarioId(item.id); setLibraryOpen(false); setSetupOpen(true);
+    setReplaying(false); setConfig(item.configuration); setResult(item.latest_result ?? undefined); setComparison(undefined); setWeek(item.latest_result?.frames.length ? item.latest_result.frames.length - 1 : 0); setScenarioId(item.id); setLibraryOpen(false); setSetupOpen(true);
   };
 
   const openHistoricalRun = (study: SavedStudy, run: HistoricalRun) => {
-    setConfig(run.configuration); setResult(run.result); setComparison(undefined); setWeek(run.result.frames.length - 1); setScenarioId(study.id); setLibraryOpen(false); setSetupOpen(true);
+    setReplaying(false); setConfig(run.configuration); setResult(run.result); setComparison(undefined); setWeek(run.result.frames.length - 1); setScenarioId(study.id); setLibraryOpen(false); setSetupOpen(true);
     toast.info("Historical run reopened", { description: "The immutable configuration and result are now active." });
   };
 
