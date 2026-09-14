@@ -4,41 +4,41 @@
 
 @layer base {
   :root {
-    --background: 190 23% 6%;
-    --foreground: 35 20% 92%;
-    --card: 188 19% 9%;
-    --card-foreground: 35 20% 92%;
-    --popover: 188 19% 11%;
-    --popover-foreground: 35 20% 92%;
-    --primary: 24 95% 53%;
-    --primary-foreground: 24 70% 9%;
-    --secondary: 185 13% 16%;
-    --secondary-foreground: 35 16% 88%;
-    --muted: 185 11% 16%;
-    --muted-foreground: 175 6% 50%;
-    --accent: 24 76% 18%;
-    --accent-foreground: 24 90% 80%;
+    --background: 0 0% 2%;
+    --foreground: 50 20% 94%;
+    --card: 0 0% 5%;
+    --card-foreground: 50 20% 94%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 50 20% 94%;
+    --primary: 48 96% 53%;
+    --primary-foreground: 52 100% 5%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 50 12% 90%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 52%;
+    --accent: 48 80% 15%;
+    --accent-foreground: 48 96% 76%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 180 10% 21%;
-    --input: 180 10% 21%;
-    --ring: 24 95% 53%;
+    --border: 0 0% 19%;
+    --input: 0 0% 19%;
+    --ring: 48 96% 53%;
     --radius: 1rem;
   }
   * { @apply border-border; }
   html { color-scheme: dark; }
   body { @apply bg-background text-foreground antialiased; margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   button, input, textarea { font: inherit; }
-  ::selection { background: rgba(249,115,22,.28); color: #fff7ed; }
+  ::selection { background: rgba(250,204,21,.28); color: #fffde8; }
 }
 
 @layer components {
-  .control { @apply h-10 rounded-xl border-white/10 bg-white/[.035] text-xs text-stone-200 shadow-none placeholder:text-stone-600 focus:ring-orange-500/30; }
+  .control { @apply h-10 rounded-xl border-white/10 bg-white/[.035] text-xs text-stone-200 shadow-none placeholder:text-stone-600 focus:ring-yellow-400/30; }
   .atlas-grid {
     background-color: transparent;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M0 36h72M36 0v72' fill='none' stroke='%23ffffff' stroke-opacity='.045' stroke-width='.5'/%3E%3Ccircle cx='36' cy='36' r='1' fill='%23f97316' fill-opacity='.14'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M0 36h72M36 0v72' fill='none' stroke='%23ffffff' stroke-opacity='.045' stroke-width='.5'/%3E%3Ccircle cx='36' cy='36' r='1' fill='%23facc15' fill-opacity='.14'/%3E%3C/svg%3E");
   }
-  .bg-atlas { background-color: #0b1214; }
+  .bg-atlas { background-color: #050505; }
 }
 
 * { scrollbar-width: thin; scrollbar-color: #394345 transparent; }
