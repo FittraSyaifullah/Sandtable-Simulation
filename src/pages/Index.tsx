@@ -12,12 +12,13 @@ import { HistoricalRun, SavedStudy, StudyLibrary } from "@/components/StudyLibra
 import { UserMenu } from "@/components/UserMenu";
 import { WorldCanvas } from "@/components/WorldCanvas";
 import { supabase } from "@/integrations/supabase/client";
-import { AgentTurn, defaultScenario, fallbackNations, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
+import { AgentTurn, AssetPool, defaultScenario, fallbackNations, Nation, ScenarioConfig, SimulationResult } from "@/lib/sandtable";
 import { runSimulation } from "@/lib/simulation";
 
 export default function Index() {
   const navigate = useNavigate();
   const [nations, setNations] = useState<Nation[]>(fallbackNations);
+  const [assetPools, setAssetPools] = useState<AssetPool[]>([]);
   const [config, setConfig] = useState<ScenarioConfig>(defaultScenario);
   const [result, setResult] = useState<SimulationResult>();
   const [week, setWeek] = useState(0);
@@ -33,12 +34,15 @@ export default function Index() {
   const [calibrationCases, setCalibrationCases] = useState<CalibrationCase[]>([]);
   const [scenarioId, setScenarioId] = useState<string>();
   const activeFrame = result?.frames[Math.min(week, result.frames.length - 1)];
-  const activeDataset = useMemo(() => nations[0]?.dataset_version ?? "local fallback", [nations]);
+  const activeDataset = useMemo(() => result?.assetDatasetVersion ? `${nations[0]?.dataset_version ?? "local fallback"} · ${result.assetDatasetVersion}` : nations[0]?.dataset_version ?? "local fallback", [nations, result]);
 
   useEffect(() => {
     supabase.from("nations").select("*").order("name").then(({ data, error }) => {
       if (data?.length) setNations(data as Nation[]);
       if (error) toast.info("Using governed local reference data", { description: "The Supabase reference query was unavailable." });
+    });
+    supabase.from("asset_pools").select("*").eq("review_status", "approved").then(({ data }) => {
+      if (data?.length) setAssetPools(data as AssetPool[]);
     });
     supabase.from("calibration_cases").select("*").eq("lifecycle_status","active").then(({ data }) => setCalibrationCases((data ?? []) as CalibrationCase[]));
   }, []);
@@ -60,14 +64,20 @@ export default function Index() {
     const nationB = nations.find(nation => nation.code === config.sideB.nationCode);
     if (!nationA || !nationB) { setRunning(false); toast.error("Choose two national profiles"); return; }
     const profile = (nation:Nation) => ({ code:nation.code, name:nation.name, budget:nation.budget_usd_bn, gdp:nation.gdp_usd_bn, population:nation.population_m, personnel:nation.personnel_k, readiness:nation.readiness_index, datasetVersion:nation.dataset_version, asOfDate:nation.as_of_date });
-    const { data, error } = await supabase.functions.invoke("conflict-agents", { body:{ objective:config.objective, duration:config.duration, sideA:profile(nationA), sideB:profile(nationB) } });
-    if (error || data?.error) {
+    const [agentResponse, poolResponse] = await Promise.all([
+      supabase.functions.invoke("conflict-agents", { body:{ objective:config.objective, duration:config.duration, sideA:profile(nationA), sideB:profile(nationB) } }),
+      supabase.from("asset_pools").select("*").eq("review_status", "approved").in("nation_code", [nationA.code, nationB.code]),
+    ]);
+    if (agentResponse.error || agentResponse.data?.error) {
       setRunning(false);
-      toast.error("National agents could not start", { description:data?.error ?? error?.message ?? "AI service unavailable." });
+      toast.error("National agents could not start", { description:agentResponse.data?.error ?? agentResponse.error?.message ?? "AI service unavailable." });
       return;
     }
-    const turns = (data.turns ?? []) as AgentTurn[];
-    const next = runSimulation(config, nations, turns);
+    const runPools = poolResponse.data?.length ? poolResponse.data as AssetPool[] : assetPools;
+    if (poolResponse.data?.length) setAssetPools(current => [...current.filter(pool => pool.nation_code !== nationA.code && pool.nation_code !== nationB.code), ...(poolResponse.data as AssetPool[])]);
+    if (poolResponse.error) toast.warning("Asset pool query unavailable", { description: "The run will use deterministic four-domain pools derived from governed national indicators." });
+    const turns = (agentResponse.data.turns ?? []) as AgentTurn[];
+    const next = runSimulation(config, nations, turns, runPools);
     setResult(next); setComparison(undefined); setWeek(0); setRunning(false); setReplaying(true); setSetupOpen(false); setScenarioId(undefined);
     toast.success("Agent simulation started", { description:`${nationA.name} and ${nationB.name} are adapting across ${config.duration} strategic turns.` });
   };
@@ -79,7 +89,7 @@ export default function Index() {
       : kind === "supply"
         ? { ...config, seed: `${config.seed}-SUPPLY`, sideA: { ...config.sideA, supply: Math.max(20, config.sideA.supply - 20) }, sideB: { ...config.sideB, supply: Math.max(20, config.sideB.supply - 20) } }
         : { ...config, uncertainty: Math.min(90, config.uncertainty + 20), seed: `${config.seed}-UNCERTAINTY` };
-    setComparison({ label: labels[kind], result: runSimulation(adjusted, nations) });
+    setComparison({ label: labels[kind], result: runSimulation(adjusted, nations, result?.agentTurns ?? [], assetPools) });
   };
 
   const saveStudy = async () => {

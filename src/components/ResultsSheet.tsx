@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, CircleDot, PackageOpen, Route, Sparkles, Target } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AgentTimeline } from "@/components/AgentTimeline";
+import { DomainCapabilityStrip } from "@/components/DomainCapabilityStrip";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,6 +44,7 @@ export function ResultsSheet({ result, config, week, setWeek, onSave, onShare, o
       {expanded && <div className="h-[calc(100%-82px)] overflow-y-auto px-3 py-3 sm:px-4 sm:py-4 md:px-6">
         <div className="mb-3 flex items-center gap-3 sm:mb-4"><span className="text-[10px] uppercase tracking-[.18em] text-stone-500">Replay</span><Slider value={[week]} max={config.duration} step={1} onValueChange={value => setWeek(value[0])} className="max-w-xl" /><span className="w-14 text-right font-mono text-xs text-yellow-200">W{String(week).padStart(2,"0")}</span></div>
         <div className="mb-3 grid grid-cols-2 gap-2 md:hidden"><Button onClick={onSave} disabled={saving} variant="outline" className="stable-action h-11 rounded-xl border-white/10 bg-white/[.03] text-stone-200">{saving ? "Saving…" : "Save study"}</Button><Button onClick={onShare} disabled={saving} className="stable-action h-11 rounded-xl bg-yellow-400 text-[#181500] hover:bg-yellow-300">Share report</Button></div>
+        {result.domainCapabilities && <DomainCapabilityStrip sideA={result.domainCapabilities.sideA} sideB={result.domainCapabilities.sideB} version={result.assetDatasetVersion}/>}
         <Tabs defaultValue="overview">
           <div className="-mx-1 overflow-x-auto px-1 pb-1"><TabsList className="h-10 min-w-max rounded-xl bg-white/[.04] p-1"><TabsTrigger className="h-8 rounded-lg px-3 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white" value="overview">Overview</TabsTrigger><TabsTrigger className="h-8 rounded-lg px-3 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white" value="interpret">Interpret</TabsTrigger><TabsTrigger className="h-8 rounded-lg px-3 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white" value="sensitivity">Sensitivity</TabsTrigger><TabsTrigger className="h-8 rounded-lg px-3 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white" value="events">Event log</TabsTrigger><TabsTrigger className="h-8 rounded-lg px-3 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white" value="trace">Traceability</TabsTrigger></TabsList></div>
           <TabsContent value="overview" className="mt-4 grid gap-4 lg:grid-cols-[1.45fr_.8fr]">

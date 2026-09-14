@@ -1,5 +1,6 @@
 export const MODEL_VERSION = "unified-force-0.3";
 export const DATASET_VERSION = "capability-reference-2025.1";
+export const ASSET_DATASET_VERSION = "asset-pools-2025.1";
 export const ENSEMBLE_SAMPLES = 240;
 
 export type Nation = {
@@ -20,6 +21,32 @@ export type Nation = {
   dataset_version: string;
   as_of_date: string;
 };
+
+export type AssetDomain = "land" | "air" | "maritime" | "support";
+
+export type AssetPool = {
+  id: string;
+  version_id: string;
+  nation_code: string;
+  domain: AssetDomain;
+  category: string;
+  inventory_low: number;
+  inventory_estimate: number;
+  inventory_high: number;
+  availability_low: number;
+  availability_high: number;
+  readiness_low: number;
+  readiness_high: number;
+  sustainment_index: number;
+  repair_rate: number;
+  replacement_rate: number;
+  confidence: "low" | "moderate" | "high";
+  review_status: "pending_review" | "approved" | "rejected";
+  evidence: unknown[];
+  updated_at: string;
+};
+
+export type DomainScores = Record<AssetDomain, number>;
 
 export type SideConfig = {
   nationCode: string;
@@ -80,6 +107,7 @@ export type AgentTurn = {
 export type SimulationResult = {
   modelVersion: string;
   datasetVersion: string;
+  assetDatasetVersion?: string;
   seed: string;
   runKey: string;
   confidence: "moderate" | "low";
@@ -90,6 +118,7 @@ export type SimulationResult = {
   medianLossB: number;
   lossRangeA: [number, number];
   lossRangeB: [number, number];
+  domainCapabilities?: { sideA: DomainScores; sideB: DomainScores };
   frames: WeeklyFrame[];
   events: SimulationEvent[];
   agentTurns?: AgentTurn[];
